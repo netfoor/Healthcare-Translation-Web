@@ -4,6 +4,8 @@ import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as logs from 'aws-cdk-lib/aws-logs';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
+import * as events from 'aws-cdk-lib/aws-events';
+import * as targets from 'aws-cdk-lib/aws-events-targets';
 import { WebSocketLambdaIntegration } from 'aws-cdk-lib/aws-apigatewayv2-integrations';
 import { Construct } from 'constructs';
 
@@ -86,6 +88,11 @@ export class WebSocketStack extends cdk.Stack {
               actions: [
                 'transcribe:StartStreamTranscription',
                 'transcribe:StartMedicalStreamTranscription',
+                'transcribe:CreateVocabulary',
+                'transcribe:GetVocabulary',
+                'transcribe:ListVocabularies',
+                'transcribe:UpdateVocabulary',
+                'transcribe:DeleteVocabulary',
               ],
               resources: ['*'],
             }),
@@ -148,6 +155,24 @@ export class WebSocketStack extends cdk.Stack {
       removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
 
+    const transcribeMedicalLogGroup = new logs.LogGroup(this, 'TranscribeMedicalHandlerLogGroup', {
+      logGroupName: '/aws/lambda/healthcare-translation-transcribe-medical',
+      retention: logs.RetentionDays.ONE_WEEK,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+
+    const medicalVocabularyLogGroup = new logs.LogGroup(this, 'MedicalVocabularyHandlerLogGroup', {
+      logGroupName: '/aws/lambda/healthcare-translation-medical-vocabulary',
+      retention: logs.RetentionDays.ONE_WEEK,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+
+    const serviceMonitorLogGroup = new logs.LogGroup(this, 'ServiceMonitorHandlerLogGroup', {
+      logGroupName: '/aws/lambda/healthcare-translation-service-monitor',
+      retention: logs.RetentionDays.ONE_WEEK,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+
     // Connection handler Lambda function
     const connectHandler = new lambda.Function(this, 'ConnectHandler', {
       runtime: lambda.Runtime.NODEJS_20_X,
@@ -190,6 +215,56 @@ export class WebSocketStack extends cdk.Stack {
       memorySize: 512, // More memory for audio processing
     });
 
+    // Transcribe Medical handler Lambda function for real-time transcription
+    const transcribeMedicalHandler = new lambda.Function(this, 'TranscribeMedicalHandler', {
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'index.handler',
+      code: lambda.Code.fromAsset('lambda/transcribe-medical'),
+      role: lambdaExecutionRole,
+      environment: {
+        CONNECTIONS_TABLE: this.connectionsTable.tableName,
+        SESSIONS_TABLE: this.sessionsTable.tableName,
+      },
+      logGroup: transcribeMedicalLogGroup,
+      timeout: cdk.Duration.minutes(15), // Extended timeout for streaming
+      memorySize: 1024, // More memory for real-time processing
+    });
+
+    // Medical vocabulary setup Lambda function (for initialization)
+    const medicalVocabularyHandler = new lambda.Function(this, 'MedicalVocabularyHandler', {
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'index.handler',
+      code: lambda.Code.fromAsset('lambda/medical-vocabulary'),
+      role: lambdaExecutionRole,
+      logGroup: medicalVocabularyLogGroup,
+      timeout: cdk.Duration.minutes(5),
+      memorySize: 256,
+    });
+
+    // Service health monitoring Lambda function
+    const serviceMonitorHandler = new lambda.Function(this, 'ServiceMonitorHandler', {
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'index.handler',
+      code: lambda.Code.fromAsset('lambda/service-monitor'),
+      role: lambdaExecutionRole,
+      environment: {
+        CONNECTIONS_TABLE: this.connectionsTable.tableName,
+        SESSIONS_TABLE: this.sessionsTable.tableName,
+      },
+      logGroup: serviceMonitorLogGroup,
+      timeout: cdk.Duration.minutes(5),
+      memorySize: 512,
+    });
+
+    // Create CloudWatch Events rule to run health checks every 5 minutes
+    const healthCheckRule = new events.Rule(this, 'HealthCheckRule', {
+      schedule: events.Schedule.rate(cdk.Duration.minutes(5)),
+      description: 'Periodic health check for Transcribe services',
+    });
+
+    // Add the service monitor Lambda as a target
+    healthCheckRule.addTarget(new targets.LambdaFunction(serviceMonitorHandler));
+
     // Create WebSocket API
     this.webSocketApi = new apigatewayv2.WebSocketApi(this, 'HealthcareTranslationWebSocketApi', {
       apiName: 'healthcare-translation-websocket',
@@ -206,6 +281,33 @@ export class WebSocketStack extends cdk.Stack {
       },
     });
 
+    // Add specific routes for Transcribe Medical actions
+    const transcribeMedicalIntegration = new WebSocketLambdaIntegration('TranscribeMedicalIntegration', transcribeMedicalHandler);
+    
+    new apigatewayv2.WebSocketRoute(this, 'StartMedicalTranscriptionRoute', {
+      webSocketApi: this.webSocketApi,
+      routeKey: 'startMedicalTranscription',
+      integration: transcribeMedicalIntegration,
+    });
+
+    new apigatewayv2.WebSocketRoute(this, 'ProcessMedicalAudioRoute', {
+      webSocketApi: this.webSocketApi,
+      routeKey: 'processMedicalAudio',
+      integration: transcribeMedicalIntegration,
+    });
+
+    new apigatewayv2.WebSocketRoute(this, 'StopMedicalTranscriptionRoute', {
+      webSocketApi: this.webSocketApi,
+      routeKey: 'stopMedicalTranscription',
+      integration: transcribeMedicalIntegration,
+    });
+
+    new apigatewayv2.WebSocketRoute(this, 'CheckTranscribeHealthRoute', {
+      webSocketApi: this.webSocketApi,
+      routeKey: 'checkTranscribeHealth',
+      integration: transcribeMedicalIntegration,
+    });
+
     // Create WebSocket stage
     this.webSocketStage = new apigatewayv2.WebSocketStage(this, 'WebSocketStage', {
       webSocketApi: this.webSocketApi,
@@ -217,8 +319,12 @@ export class WebSocketStack extends cdk.Stack {
     this.connectionsTable.grantReadWriteData(connectHandler);
     this.connectionsTable.grantReadWriteData(disconnectHandler);
     this.connectionsTable.grantReadWriteData(messageHandler);
+    this.connectionsTable.grantReadWriteData(transcribeMedicalHandler);
     this.sessionsTable.grantReadWriteData(messageHandler);
     this.sessionsTable.grantReadWriteData(disconnectHandler);
+    this.sessionsTable.grantReadWriteData(transcribeMedicalHandler);
+    this.connectionsTable.grantReadWriteData(serviceMonitorHandler);
+    this.sessionsTable.grantReadWriteData(serviceMonitorHandler);
 
     // Update Lambda execution role with specific API Gateway permissions
     lambdaExecutionRole.addToPolicy(

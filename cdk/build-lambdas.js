@@ -1,33 +1,40 @@
-const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+const { execSync } = require('child_process');
 
-const lambdaDirs = ['connect', 'disconnect', 'message'];
+// Lambda directories to build
+const lambdaDirs = [
+  'lambda/connect',
+  'lambda/disconnect', 
+  'lambda/message',
+  'lambda/transcribe-medical',
+  'lambda/medical-vocabulary',
+  'lambda/service-monitor'
+];
 
 console.log('Building Lambda functions...');
 
 lambdaDirs.forEach(dir => {
-  const lambdaPath = path.join(__dirname, 'lambda', dir);
+  const fullPath = path.join(__dirname, dir);
   
-  console.log(`Building ${dir} Lambda...`);
-  
-  // Install dependencies
-  try {
-    execSync('npm install', { cwd: lambdaPath, stdio: 'inherit' });
-  } catch (error) {
-    console.error(`Failed to install dependencies for ${dir}:`, error.message);
-  }
-  
-  // Compile TypeScript to JavaScript
-  try {
-    execSync('npx tsc index.ts --target ES2020 --module commonjs --esModuleInterop --skipLibCheck', { 
-      cwd: lambdaPath, 
-      stdio: 'inherit' 
-    });
-    console.log(`✓ ${dir} Lambda built successfully`);
-  } catch (error) {
-    console.error(`Failed to build ${dir} Lambda:`, error.message);
+  if (fs.existsSync(fullPath)) {
+    console.log(`Building ${dir}...`);
+    
+    // Check if there's a package.json in the lambda directory
+    const packageJsonPath = path.join(fullPath, 'package.json');
+    if (fs.existsSync(packageJsonPath)) {
+      try {
+        execSync('npm install', { cwd: fullPath, stdio: 'inherit' });
+        console.log(`✓ Built ${dir}`);
+      } catch (error) {
+        console.error(`✗ Failed to build ${dir}:`, error.message);
+      }
+    } else {
+      console.log(`✓ ${dir} (no package.json, using parent dependencies)`);
+    }
+  } else {
+    console.log(`⚠ ${dir} directory not found`);
   }
 });
 
-console.log('Lambda build complete!');
+console.log('Lambda build process completed.');
