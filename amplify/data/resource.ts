@@ -13,6 +13,8 @@ const schema = a.schema({
       status: a.enum(['active', 'paused', 'ended']),
       createdAt: a.datetime(),
       lastActivity: a.datetime(),
+      transcriptEntry: a.hasMany("TranscriptEntry", "sessionId"),
+      audioMetadata: a.hasMany("AudioMetadata", "sessionId")
     })
     .authorization((allow) => [
       allow.owner(),

@@ -3,6 +3,8 @@
  * Data models and service contracts
  */
 
+import { AuthUser } from 'aws-amplify/auth';
+
 // Core Data Models
 export interface TranslationSession {
   id: string;
@@ -155,15 +157,8 @@ export interface AppLayoutProps {
   user?: AuthUser;
 }
 
-// Authentication Types (will be properly typed when Amplify Auth is configured)
-export interface AuthUser {
-  id: string;
-  email: string;
-  name?: string;
-  givenName?: string;
-  familyName?: string;
-  preferredUsername?: string;
-}
+// Authentication Types - Re-export from aws-amplify/auth for consistency
+export type { AuthUser } from 'aws-amplify/auth';
 
 // WebSocket Message Types
 export interface WebSocketMessage<T = Record<string, unknown>> {
