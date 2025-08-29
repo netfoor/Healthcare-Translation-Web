@@ -47,3 +47,11 @@ node_modules
 amplify_outputs*
 amplifyconfiguration*
 
+# CDK outputs
+cdk/cdk.out/
+cdk/*.js
+cdk/*.d.ts
+cdk/lambda/*/*.js
+cdk/lambda/*/*.d.ts
+cdk/lambda/*/node_modules/
+

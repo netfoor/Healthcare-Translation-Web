@@ -1,0 +1,23 @@
+# CDK build outputs
+*.js
+*.js.map
+*.d.ts
+node_modules/
+cdk.out/
+
+# Keep source files
+!jest.config.js
+!build-lambdas.js
+
+# Lambda build outputs
+lambda/*/node_modules/
+lambda/*/*.js
+lambda/*/*.js.map
+lambda/*/*.d.ts
+
+# CDK Context
+cdk.context.json
+
+# Environment files
+.env
+.env.local

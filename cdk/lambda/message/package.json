@@ -1,0 +1,9 @@
+{
+  "name": "websocket-message-handler",
+  "version": "1.0.0",
+  "main": "index.js",
+  "dependencies": {
+    "@aws-sdk/client-apigatewaymanagementapi": "^3.400.0",
+    "@aws-sdk/client-dynamodb": "^3.400.0"
+  }
+}
