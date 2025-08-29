@@ -1,3 +1,5 @@
+'use client';
+
 import { AuthWrapper } from '@/components/AuthWrapper';
 import { SessionManager } from '@/components/SessionManager';
 
@@ -27,9 +29,15 @@ export default function Home() {
               <h3 className="text-lg font-semibold text-blue-900 mb-2">
                 Voice-to-Text
               </h3>
-              <p className="text-blue-700">
+              <p className="text-blue-700 mb-3">
                 Convert spoken patient input into accurate text transcripts with AI enhancement
               </p>
+              <button
+                onClick={() => window.location.href = '/audio-demo'}
+                className="inline-flex items-center text-sm text-blue-600 hover:text-blue-700 font-medium"
+              >
+                Try Audio Demo →
+              </button>
             </div>
 
             <div className="bg-green-50 p-6 rounded-lg border border-green-200">
@@ -72,6 +80,7 @@ export default function Home() {
               <li>✅ Development Environment Setup</li>
               <li>✅ Authentication Components Implemented</li>
               <li>✅ Session Management System Created</li>
+              <li>✅ Audio Capture and Processing Infrastructure</li>
               <li>⏳ Deploy backend with <code className="bg-gray-200 px-1 rounded">npx ampx sandbox</code></li>
             </ul>
             
