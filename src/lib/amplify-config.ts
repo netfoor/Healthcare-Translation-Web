@@ -8,7 +8,7 @@ import outputs from '../../amplify_outputs.json';
 export function configureAmplify() {
   try {
     Amplify.configure(outputs);
-  } catch (error) {
+  } catch {
     console.warn('Amplify configuration not found. Run `npx ampx sandbox` to generate configuration.');
   }
 }

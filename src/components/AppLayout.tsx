@@ -2,7 +2,10 @@ import React from 'react';
 
 interface AppLayoutProps {
   children: React.ReactNode;
-  user?: any; // Will be properly typed when Amplify Auth is set up
+  user?: {
+    name?: string;
+    email?: string;
+  } | null; // Will be properly typed when Amplify Auth is set up
 }
 
 export default function AppLayout({ children, user }: AppLayoutProps) {

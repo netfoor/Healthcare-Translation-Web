@@ -166,41 +166,36 @@ export interface AuthUser {
 }
 
 // WebSocket Message Types
-export interface WebSocketMessage {
+export interface WebSocketMessage<T = Record<string, unknown>> {
   type: 'audio' | 'transcript' | 'translation' | 'error' | 'status';
-  payload: any;
+  payload: T;
   timestamp: Date;
   sessionId?: string;
 }
 
-export interface AudioChunkMessage extends WebSocketMessage {
+export interface AudioChunkMessage extends WebSocketMessage<{
+  audioData: ArrayBuffer;
+  sequence: number;
+  isLast: boolean;
+}> {
   type: 'audio';
-  payload: {
-    audioData: ArrayBuffer;
-    sequence: number;
-    isLast: boolean;
-  };
 }
 
-export interface TranscriptMessage extends WebSocketMessage {
+export interface TranscriptMessage extends WebSocketMessage<TranscriptResult> {
   type: 'transcript';
-  payload: TranscriptResult;
 }
 
-export interface TranslationMessage extends WebSocketMessage {
+export interface TranslationMessage extends WebSocketMessage<TranslationResult> {
   type: 'translation';
-  payload: TranslationResult;
 }
 
-export interface ErrorMessage extends WebSocketMessage {
+export interface ErrorMessage extends WebSocketMessage<ServiceError> {
   type: 'error';
-  payload: ServiceError;
 }
 
-export interface StatusMessage extends WebSocketMessage {
+export interface StatusMessage extends WebSocketMessage<{
+  status: string;
+  message: string;
+}> {
   type: 'status';
-  payload: {
-    status: string;
-    message: string;
-  };
 }
