@@ -35,7 +35,7 @@ export interface TranslationEnhancementResult {
 }
 
 // Common medical terminology mappings for different languages
-const MEDICAL_TERMINOLOGY_MAPPINGS = {
+const MEDICAL_TERMINOLOGY_MAPPINGS: Record<string, Record<string, string>> = {
     'en-es': {
         'chest pain': 'dolor torácico',
         'shortness of breath': 'dificultad para respirar',
@@ -75,8 +75,187 @@ const MEDICAL_TERMINOLOGY_MAPPINGS = {
         'nurse': 'infirmière',
         'hospital': 'hôpital',
         'clinic': 'clinique'
+    },
+    'en-de': {
+        'chest pain': 'Brustschmerzen',
+        'shortness of breath': 'Atemnot',
+        'heart attack': 'Herzinfarkt',
+        'blood pressure': 'Blutdruck',
+        'diabetes': 'Diabetes',
+        'hypertension': 'Bluthochdruck',
+        'medication': 'Medikament',
+        'prescription': 'Rezept',
+        'symptoms': 'Symptome',
+        'diagnosis': 'Diagnose',
+        'treatment': 'Behandlung',
+        'surgery': 'Operation',
+        'emergency': 'Notfall',
+        'patient': 'Patient',
+        'doctor': 'Arzt',
+        'nurse': 'Krankenschwester',
+        'hospital': 'Krankenhaus',
+        'clinic': 'Klinik'
+    },
+    'en-it': {
+        'chest pain': 'dolore al petto',
+        'shortness of breath': 'mancanza di respiro',
+        'heart attack': 'infarto',
+        'blood pressure': 'pressione sanguigna',
+        'diabetes': 'diabete',
+        'hypertension': 'ipertensione',
+        'medication': 'farmaco',
+        'prescription': 'prescrizione',
+        'symptoms': 'sintomi',
+        'diagnosis': 'diagnosi',
+        'treatment': 'trattamento',
+        'surgery': 'chirurgia',
+        'emergency': 'emergenza',
+        'patient': 'paziente',
+        'doctor': 'dottore',
+        'nurse': 'infermiera',
+        'hospital': 'ospedale',
+        'clinic': 'clinica'
+    },
+    'en-pt': {
+        'chest pain': 'dor no peito',
+        'shortness of breath': 'falta de ar',
+        'heart attack': 'ataque cardíaco',
+        'blood pressure': 'pressão arterial',
+        'diabetes': 'diabetes',
+        'hypertension': 'hipertensão',
+        'medication': 'medicamento',
+        'prescription': 'receita',
+        'symptoms': 'sintomas',
+        'diagnosis': 'diagnóstico',
+        'treatment': 'tratamento',
+        'surgery': 'cirurgia',
+        'emergency': 'emergência',
+        'patient': 'paciente',
+        'doctor': 'médico',
+        'nurse': 'enfermeira',
+        'hospital': 'hospital',
+        'clinic': 'clínica'
+    },
+    'en-zh': {
+        'chest pain': '胸痛',
+        'shortness of breath': '呼吸困难',
+        'heart attack': '心脏病发作',
+        'blood pressure': '血压',
+        'diabetes': '糖尿病',
+        'hypertension': '高血压',
+        'medication': '药物',
+        'prescription': '处方',
+        'symptoms': '症状',
+        'diagnosis': '诊断',
+        'treatment': '治疗',
+        'surgery': '手术',
+        'emergency': '紧急情况',
+        'patient': '患者',
+        'doctor': '医生',
+        'nurse': '护士',
+        'hospital': '医院',
+        'clinic': '诊所'
+    },
+    'en-ja': {
+        'chest pain': '胸痛',
+        'shortness of breath': '息切れ',
+        'heart attack': '心臓発作',
+        'blood pressure': '血圧',
+        'diabetes': '糖尿病',
+        'hypertension': '高血圧',
+        'medication': '薬',
+        'prescription': '処方箋',
+        'symptoms': '症状',
+        'diagnosis': '診断',
+        'treatment': '治療',
+        'surgery': '手術',
+        'emergency': '緊急事態',
+        'patient': '患者',
+        'doctor': '医師',
+        'nurse': '看護師',
+        'hospital': '病院',
+        'clinic': 'クリニック'
+    },
+    'en-ko': {
+        'chest pain': '가슴 통증',
+        'shortness of breath': '호흡곤란',
+        'heart attack': '심장마비',
+        'blood pressure': '혈압',
+        'diabetes': '당뇨병',
+        'hypertension': '고혈압',
+        'medication': '약물',
+        'prescription': '처방전',
+        'symptoms': '증상',
+        'diagnosis': '진단',
+        'treatment': '치료',
+        'surgery': '수술',
+        'emergency': '응급상황',
+        'patient': '환자',
+        'doctor': '의사',
+        'nurse': '간호사',
+        'hospital': '병원',
+        'clinic': '클리닉'
+    },
+    'en-ar': {
+        'chest pain': 'ألم في الصدر',
+        'shortness of breath': 'ضيق في التنفس',
+        'heart attack': 'نوبة قلبية',
+        'blood pressure': 'ضغط الدم',
+        'diabetes': 'السكري',
+        'hypertension': 'ارتفاع ضغط الدم',
+        'medication': 'دواء',
+        'prescription': 'وصفة طبية',
+        'symptoms': 'أعراض',
+        'diagnosis': 'تشخيص',
+        'treatment': 'علاج',
+        'surgery': 'جراحة',
+        'emergency': 'طوارئ',
+        'patient': 'مريض',
+        'doctor': 'طبيب',
+        'nurse': 'ممرضة',
+        'hospital': 'مستشفى',
+        'clinic': 'عيادة'
+    },
+    'en-hi': {
+        'chest pain': 'सीने में दर्द',
+        'shortness of breath': 'सांस लेने में कठिनाई',
+        'heart attack': 'दिल का दौरा',
+        'blood pressure': 'रक्तचाप',
+        'diabetes': 'मधुमेह',
+        'hypertension': 'उच्च रक्तचाप',
+        'medication': 'दवा',
+        'prescription': 'नुस्खा',
+        'symptoms': 'लक्षण',
+        'diagnosis': 'निदान',
+        'treatment': 'इलाज',
+        'surgery': 'सर्जरी',
+        'emergency': 'आपातकाल',
+        'patient': 'मरीज़',
+        'doctor': 'डॉक्टर',
+        'nurse': 'नर्स',
+        'hospital': 'अस्पताल',
+        'clinic': 'क्लिनिक'
+    },
+    'en-ru': {
+        'chest pain': 'боль в груди',
+        'shortness of breath': 'одышка',
+        'heart attack': 'сердечный приступ',
+        'blood pressure': 'кровяное давление',
+        'diabetes': 'диабет',
+        'hypertension': 'гипертония',
+        'medication': 'лекарство',
+        'prescription': 'рецепт',
+        'symptoms': 'симптомы',
+        'diagnosis': 'диагноз',
+        'treatment': 'лечение',
+        'surgery': 'операция',
+        'emergency': 'экстренная ситуация',
+        'patient': 'пациент',
+        'doctor': 'врач',
+        'nurse': 'медсестра',
+        'hospital': 'больница',
+        'clinic': 'клиника'
     }
-    // Add more language pairs as needed
 };
 
 // Healthcare communication scenarios
@@ -115,6 +294,40 @@ const HEALTHCARE_SCENARIOS = {
         medicalTerms: ['prescription', 'checkup', 'appointment', 'results', 'routine']
     }
 };
+
+// Helper function to get medical terminology mapping key
+function getMedicalMappingKey(sourceLanguage: string, targetLanguage: string): string {
+    // Normalize language codes to base language (remove region)
+    const normalizeLanguage = (lang: string): string => {
+        const langMap: Record<string, string> = {
+            'en-US': 'en',
+            'es-US': 'es',
+            'es-ES': 'es',
+            'fr-FR': 'fr',
+            'de-DE': 'de',
+            'it-IT': 'it',
+            'pt-BR': 'pt',
+            'zh-CN': 'zh',
+            'ja-JP': 'ja',
+            'ko-KR': 'ko',
+            'ar-AE': 'ar',
+            'hi-IN': 'hi',
+            'ru-RU': 'ru'
+        };
+        return langMap[lang] || lang.split('-')[0];
+    };
+
+    const sourceLang = normalizeLanguage(sourceLanguage);
+    const targetLang = normalizeLanguage(targetLanguage);
+    
+    return `${sourceLang}-${targetLang}`;
+}
+
+// Get medical terminology mapping for language pair
+export function getMedicalTerminologyMapping(sourceLanguage: string, targetLanguage: string): Record<string, string> {
+    const mappingKey = getMedicalMappingKey(sourceLanguage, targetLanguage);
+    return MEDICAL_TERMINOLOGY_MAPPINGS[mappingKey] || {};
+}
 
 // Detect medical scenario based on text content
 export async function detectMedicalScenario(text: string): Promise<string> {

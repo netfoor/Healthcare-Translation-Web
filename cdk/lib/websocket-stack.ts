@@ -206,6 +206,12 @@ export class WebSocketStack extends cdk.Stack {
             removalPolicy: cdk.RemovalPolicy.DESTROY,
         });
 
+        const pollyTtsLogGroup = new logs.LogGroup(this, 'PollyTtsHandlerLogGroup', {
+            logGroupName: '/aws/lambda/healthcare-translation-polly-tts',
+            retention: logs.RetentionDays.ONE_WEEK,
+            removalPolicy: cdk.RemovalPolicy.DESTROY,
+        });
+
         // Connection handler Lambda function
         const connectHandler = new lambda.Function(this, 'ConnectHandler', {
             runtime: lambda.Runtime.NODEJS_20_X,
@@ -320,6 +326,22 @@ export class WebSocketStack extends cdk.Stack {
             memorySize: 1024, // More memory for AI-enhanced translation
         });
 
+        // Polly TTS service Lambda function
+        const pollyTtsHandler = new lambda.Function(this, 'PollyTtsHandler', {
+            runtime: lambda.Runtime.NODEJS_20_X,
+            handler: 'index.handler',
+            code: lambda.Code.fromAsset('lambda/polly-tts'),
+            role: lambdaExecutionRole,
+            environment: {
+                CONNECTIONS_TABLE: this.connectionsTable.tableName,
+                SESSIONS_TABLE: this.sessionsTable.tableName,
+                AUDIO_BUCKET: 'healthcare-translation-audio-cache', // Will be created separately
+            },
+            logGroup: pollyTtsLogGroup,
+            timeout: cdk.Duration.minutes(5), // Extended timeout for audio synthesis
+            memorySize: 1024, // More memory for audio processing
+        });
+
         // Create CloudWatch Events rule to run health checks every 5 minutes
         const healthCheckRule = new events.Rule(this, 'HealthCheckRule', {
             schedule: events.Schedule.rate(cdk.Duration.minutes(5)),
@@ -426,6 +448,21 @@ export class WebSocketStack extends cdk.Stack {
             integration: translationIntegration,
         });
 
+        // Add Polly TTS service routes
+        const pollyTtsIntegration = new WebSocketLambdaIntegration('PollyTtsIntegration', pollyTtsHandler);
+
+        new apigatewayv2.WebSocketRoute(this, 'SynthesizeSpeechRoute', {
+            webSocketApi: this.webSocketApi,
+            routeKey: 'synthesizeSpeech',
+            integration: pollyTtsIntegration,
+        });
+
+        new apigatewayv2.WebSocketRoute(this, 'GenerateSSMLRoute', {
+            webSocketApi: this.webSocketApi,
+            routeKey: 'generateSSML',
+            integration: pollyTtsIntegration,
+        });
+
         // Create WebSocket stage
         this.webSocketStage = new apigatewayv2.WebSocketStage(this, 'WebSocketStage', {
             webSocketApi: this.webSocketApi,
@@ -448,6 +485,9 @@ export class WebSocketStack extends cdk.Stack {
         this.connectionsTable.grantReadWriteData(translationHandler);
         this.sessionsTable.grantReadWriteData(translationHandler);
         translationCacheTable.grantReadWriteData(translationHandler);
+        this.connectionsTable.grantReadWriteData(pollyTtsHandler);
+        this.sessionsTable.grantReadWriteData(pollyTtsHandler);
+        translationCacheTable.grantReadWriteData(pollyTtsHandler);
 
         // Update Lambda execution role with specific API Gateway permissions
         lambdaExecutionRole.addToPolicy(
