@@ -9,7 +9,8 @@ const lambdaDirs = [
   'lambda/message',
   'lambda/transcribe-medical',
   'lambda/medical-vocabulary',
-  'lambda/service-monitor'
+  'lambda/service-monitor',
+  'lambda/bedrock-ai'
 ];
 
 console.log('Building Lambda functions...');

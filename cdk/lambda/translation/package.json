@@ -1,0 +1,37 @@
+{
+  "name": "healthcare-translation-service",
+  "version": "1.0.0",
+  "description": "AWS Lambda function for healthcare translation with medical context awareness",
+  "main": "index.js",
+  "scripts": {
+    "build": "tsc",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage"
+  },
+  "dependencies": {
+    "@aws-sdk/client-translate": "^3.0.0",
+    "@aws-sdk/client-dynamodb": "^3.0.0",
+    "@aws-sdk/client-bedrock-runtime": "^3.0.0",
+    "@aws-sdk/client-apigatewaymanagementapi": "^3.0.0"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.0",
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0",
+    "jest": "^29.0.0",
+    "@types/jest": "^29.0.0",
+    "ts-jest": "^29.0.0"
+  },
+  "keywords": [
+    "aws",
+    "lambda",
+    "healthcare",
+    "translation",
+    "medical",
+    "bedrock",
+    "translate"
+  ],
+  "author": "Healthcare Translation Team",
+  "license": "MIT"
+}
