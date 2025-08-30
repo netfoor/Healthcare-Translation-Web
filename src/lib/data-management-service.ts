@@ -351,7 +351,7 @@ export class DataManagementService {
   }> {
     const result = {
       imported: { sessions: 0, transcripts: 0, audioFiles: 0 },
-      errors: [],
+      errors: [] as string[],
     };
 
     try {

@@ -151,7 +151,7 @@ describe('WebSocketManager', () => {
 
       expect(response.success).toBe(true);
       expect(response.action).toBe('testResponse');
-      expect(response.data.received).toEqual(message.data);
+      expect(response.data?.received).toEqual(message.data);
     });
 
     test('should handle message timeout', async () => {

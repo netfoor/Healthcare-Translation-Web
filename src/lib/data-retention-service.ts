@@ -100,7 +100,7 @@ export class DataRetentionService {
       transcriptsDeleted: 0,
       audioFilesDeleted: 0,
       tempFilesDeleted: 0,
-      errors: [],
+      errors: [] as string[],
       totalProcessed: 0,
       duration: 0,
     };
@@ -159,7 +159,7 @@ export class DataRetentionService {
       sessionsDeleted: 0,
       transcriptsDeleted: 0,
       audioFilesDeleted: 0,
-      errors: [],
+      errors: [] as string[],
     };
 
     try {
@@ -170,9 +170,9 @@ export class DataRetentionService {
 
       // Get all user sessions
       const { sessions } = await dataLayer.listUserSessions(user.userId, { limit: 1000 });
-      
+
       // Filter expired sessions
-      const expiredSessions = sessions.filter(session => 
+      const expiredSessions = sessions.filter(session =>
         session.lastActivity < cutoffTime
       );
 
@@ -181,7 +181,7 @@ export class DataRetentionService {
       // Process sessions in batches
       for (let i = 0; i < expiredSessions.length; i += CLEANUP_BATCH_SIZE) {
         const batch = expiredSessions.slice(i, i + CLEANUP_BATCH_SIZE);
-        
+
         for (const session of batch) {
           try {
             // Get session statistics before deletion
@@ -233,12 +233,12 @@ export class DataRetentionService {
     const result = {
       orphanedTranscripts: 0,
       orphanedAudioFiles: 0,
-      errors: [],
+      errors: [] as string[],
     };
 
     try {
       const user = await getCurrentUser();
-      
+
       // Get all user sessions to build a valid session ID set
       const { sessions } = await dataLayer.listUserSessions(user.userId, { limit: 1000 });
       const validSessionIds = new Set(sessions.map(s => s.id));
@@ -268,7 +268,7 @@ export class DataRetentionService {
         Date.now() - (this.retentionPolicy.sessionRetentionHours * 60 * 60 * 1000)
       );
 
-      const expiredSessions = sessions.filter(session => 
+      const expiredSessions = sessions.filter(session =>
         session.lastActivity < cutoffTime
       );
 
@@ -292,12 +292,12 @@ export class DataRetentionService {
         totalTranscripts,
         totalAudioFiles: storageStats.totalFiles,
         totalStorageSize: storageStats.totalSize,
-        oldestSession: sessions.length > 0 ? 
-          sessions.reduce((oldest, session) => 
+        oldestSession: sessions.length > 0 ?
+          sessions.reduce((oldest, session) =>
             session.createdAt < oldest.createdAt ? session : oldest
           ).createdAt : undefined,
-        newestSession: sessions.length > 0 ? 
-          sessions.reduce((newest, session) => 
+        newestSession: sessions.length > 0 ?
+          sessions.reduce((newest, session) =>
             session.createdAt > newest.createdAt ? session : newest
           ).createdAt : undefined,
       };
@@ -326,7 +326,7 @@ export class DataRetentionService {
       );
 
       const { sessions } = await dataLayer.listUserSessions(user.userId, { limit: 1000 });
-      const expiredSessions = sessions.filter(session => 
+      const expiredSessions = sessions.filter(session =>
         session.lastActivity < cutoffTime
       );
 
@@ -341,10 +341,10 @@ export class DataRetentionService {
         try {
           const { entries } = await dataLayer.getSessionTranscripts(session.id, { limit: 1000 });
           const audioFiles = await dataLayer.getSessionAudioMetadata(session.id);
-          
+
           transcriptsToDelete += entries.length;
           audioFilesToDelete += audioFiles.length;
-          
+
           // Estimate storage (would need actual file sizes)
           storageToFree += audioFiles.length * 1024 * 1024; // Rough estimate: 1MB per file
         } catch (error) {
@@ -391,12 +391,12 @@ export class DataRetentionService {
     }
 
     console.log(`Automatic cleanup scheduled every ${intervalHours} hours`);
-    
+
     // In a real implementation, this would integrate with:
     // - AWS EventBridge for scheduled Lambda execution
     // - Browser-based intervals for client-side cleanup
     // - Background service workers
-    
+
     // For now, we'll just log the setup
     console.log('Note: Automatic cleanup requires integration with a scheduling service');
   }
@@ -412,7 +412,7 @@ export class DataRetentionService {
       transcriptsDeleted: 0,
       audioFilesDeleted: 0,
       tempFilesDeleted: 0,
-      errors: [],
+      errors: [] as string[],
       totalProcessed: 0,
       duration: 0,
     };
@@ -449,7 +449,7 @@ export class DataRetentionService {
   }> {
     try {
       const stats = await this.getRetentionStats();
-      
+
       const recommendations: string[] = [];
       let complianceStatus: 'compliant' | 'warning' | 'non-compliant' = 'compliant';
 
