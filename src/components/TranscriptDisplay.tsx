@@ -118,7 +118,7 @@ export function TranscriptDisplay({
             )}
             
             <div className="flex items-center justify-between mt-2">
-              <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+              <div className="flex items-center gap-2 text-xs text-blue-600 dark:text-blue-400 font-medium">
                 <span>{entry.timestamp.toLocaleTimeString()}</span>
                 {entry.confidence < 1 && (
                   <span className={`px-1.5 py-0.5 rounded text-xs ${
@@ -167,7 +167,7 @@ export function TranscriptDisplay({
             {isProcessing ? (
               <div className="flex items-center gap-2">
                 <LoadingSpinner size="sm" />
-                <span className="text-sm text-gray-500 dark:text-gray-400">
+                <span className="text-sm text-blue-700 dark:text-blue-300 font-medium">
                   {type === 'translated' ? 'Translating...' : 'Listening...'}
                 </span>
               </div>
@@ -220,7 +220,7 @@ export function TranscriptDisplay({
             </button>
           )}
           
-          <span className="text-sm text-gray-500 dark:text-gray-400">
+          <span className="text-sm text-blue-600 dark:text-blue-400 font-medium">
             {entries.length} entries
           </span>
         </div>
