@@ -13,14 +13,14 @@ export const auth = defineAuth({
       callbackUrls: [
         'http://localhost:3000/',
         'http://localhost:3000/auth/callback',
-        // Add your production URLs here when deploying
-        // 'https://yourdomain.com/',
-        // 'https://yourdomain.com/auth/callback',
+        // Production URLs from environment variables
+        process.env.AMPLIFY_APP_URL || '',
+        `${process.env.AMPLIFY_APP_URL || ''}/auth/callback`,
       ],
       logoutUrls: [
         'http://localhost:3000/',
-        // Add your production URLs here when deploying
-        // 'https://yourdomain.com/',
+        // Production URLs from environment variables
+        `${process.env.AMPLIFY_APP_URL || ''}/`,
       ],
     },
   },

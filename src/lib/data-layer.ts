@@ -53,7 +53,7 @@ export class DataLayer {
           ttl: Math.floor(ttl.getTime() / 1000),
         };
 
-        const { data: createdSession, errors } = await client.models.TranslationSession.create(sessionData as any);
+        const { data: createdSession, errors } = await client.models.TranslationSession.create(sessionData);
 
         if (errors && errors.length > 0) {
           throw new Error(`Failed to create session: ${errors.map(e => e.message).join(', ')}`);
@@ -105,18 +105,16 @@ export class DataLayer {
         const now = new Date();
         const ttl = this.calculateTTL(now);
 
-        const updateData: Record<string, unknown> = {
+        const updateData = {
           id: sessionId,
           lastActivity: now.toISOString(),
-          ttl: Math.floor(ttl.getTime() / 1000), // Refresh TTL on update
+          ttl: Math.floor(ttl.getTime() / 1000),
+          ...(updates.inputLanguage && { inputLanguage: updates.inputLanguage }),
+          ...(updates.outputLanguage && { outputLanguage: updates.outputLanguage }),
+          ...(updates.status && { status: updates.status }),
         };
 
-        // Add only provided updates
-        if (updates.inputLanguage) updateData.inputLanguage = updates.inputLanguage;
-        if (updates.outputLanguage) updateData.outputLanguage = updates.outputLanguage;
-        if (updates.status) updateData.status = updates.status;
-
-        const { data: updatedSession, errors } = await client.models.TranslationSession.update(updateData as any);
+        const { data: updatedSession, errors } = await client.models.TranslationSession.update(updateData);
 
         if (errors && errors.length > 0) {
           throw new Error(`Failed to update session: ${errors.map(e => e.message).join(', ')}`);
@@ -152,7 +150,7 @@ export class DataLayer {
       try {
         const { limit = 20, nextToken, status } = options;
 
-        let filter: any = { userId: { eq: userId } };
+        let filter: Record<string, unknown> = { userId: { eq: userId } };
         if (status) {
           filter = { ...filter, status: { eq: status } };
         }
@@ -231,7 +229,7 @@ export class DataLayer {
           ttl: Math.floor(ttl.getTime() / 1000),
         };
 
-        const { data: createdEntry, errors } = await client.models.TranscriptEntry.create(entryData as any);
+        const { data: createdEntry, errors } = await client.models.TranscriptEntry.create(entryData);
 
         if (errors && errors.length > 0) {
           throw new Error(`Failed to create transcript entry: ${errors.map(e => e.message).join(', ')}`);
@@ -255,14 +253,15 @@ export class DataLayer {
   async updateTranscriptEntry(entryId: string, updates: Partial<TranscriptEntry>): Promise<TranscriptEntry> {
     return this.withRetry(async () => {
       try {
-        const updateData: Record<string, unknown> = { id: entryId };
+        const updateData = {
+          id: entryId,
+          ...(updates.translatedText !== undefined && { translatedText: updates.translatedText }),
+          ...(updates.confidence !== undefined && { confidence: updates.confidence }),
+          ...(updates.isProcessing !== undefined && { isProcessing: updates.isProcessing }),
+          ...(updates.speaker !== undefined && { speaker: updates.speaker }),
+        };
 
-        if (updates.translatedText !== undefined) updateData.translatedText = updates.translatedText;
-        if (updates.confidence !== undefined) updateData.confidence = updates.confidence;
-        if (updates.isProcessing !== undefined) updateData.isProcessing = updates.isProcessing;
-        if (updates.speaker !== undefined) updateData.speaker = updates.speaker;
-
-        const { data: updatedEntry, errors } = await client.models.TranscriptEntry.update(updateData as any);
+        const { data: updatedEntry, errors } = await client.models.TranscriptEntry.update(updateData);
 
         if (errors && errors.length > 0) {
           throw new Error(`Failed to update transcript entry: ${errors.map(e => e.message).join(', ')}`);
@@ -298,7 +297,7 @@ export class DataLayer {
         const { limit = 50, nextToken } = options;
 
         const { data: entries, errors, nextToken: responseNextToken } = await client.models.TranscriptEntry.list({
-          filter: { sessionId: { eq: sessionId } } as any,
+          filter: { sessionId: { eq: sessionId } },
           limit,
           nextToken,
         });
@@ -360,7 +359,7 @@ export class DataLayer {
           ttl: Math.floor(ttl.getTime() / 1000),
         };
 
-        const { data: createdMetadata, errors } = await client.models.AudioMetadata.create(metadataData as any);
+        const { data: createdMetadata, errors } = await client.models.AudioMetadata.create(metadataData);
 
         if (errors && errors.length > 0) {
           throw new Error(`Failed to create audio metadata: ${errors.map(e => e.message).join(', ')}`);
@@ -385,7 +384,7 @@ export class DataLayer {
     return this.withRetry(async () => {
       try {
         const { data: metadata, errors } = await client.models.AudioMetadata.list({
-          filter: { sessionId: { eq: sessionId } } as any,
+          filter: { sessionId: { eq: sessionId } },
         });
 
         if (errors && errors.length > 0) {
@@ -498,46 +497,50 @@ export class DataLayer {
   /**
    * Map DynamoDB session data to application model
    */
-  private mapSessionFromDynamoDB(dbSession: any): TranslationSession {
+  private mapSessionFromDynamoDB(dbSession: unknown): TranslationSession {
+    const session = dbSession as Record<string, unknown>;
+    const status = session.status as string;
     return {
-      id: dbSession.id,
-      userId: dbSession.userId,
-      inputLanguage: dbSession.inputLanguage,
-      outputLanguage: dbSession.outputLanguage,
-      status: dbSession.status || 'active',
-      createdAt: new Date(dbSession.createdAt || Date.now()),
-      lastActivity: new Date(dbSession.lastActivity || Date.now()),
+      id: session.id as string,
+      userId: session.userId as string,
+      inputLanguage: session.inputLanguage as string,
+      outputLanguage: session.outputLanguage as string,
+      status: (status === 'active' || status === 'paused' || status === 'ended') ? status : 'active',
+      createdAt: new Date((session.createdAt as string) || Date.now()),
+      lastActivity: new Date((session.lastActivity as string) || Date.now()),
     };
   }
 
   /**
    * Map DynamoDB transcript data to application model
    */
-  private mapTranscriptFromDynamoDB(dbEntry: any): TranscriptEntry {
+  private mapTranscriptFromDynamoDB(dbEntry: unknown): TranscriptEntry {
+    const entry = dbEntry as Record<string, unknown>;
     return {
-      id: dbEntry.id,
-      sessionId: dbEntry.sessionId,
-      originalText: dbEntry.originalText,
-      translatedText: dbEntry.translatedText || undefined,
-      confidence: dbEntry.confidence || 0,
-      timestamp: new Date(dbEntry.timestamp || Date.now()),
-      speaker: dbEntry.speaker || undefined,
-      isProcessing: dbEntry.isProcessing || false,
+      id: entry.id as string,
+      sessionId: entry.sessionId as string,
+      originalText: entry.originalText as string,
+      translatedText: (entry.translatedText as string) || undefined,
+      confidence: (entry.confidence as number) || 0,
+      timestamp: new Date((entry.timestamp as string) || Date.now()),
+      speaker: entry.speaker as string || undefined,
+      isProcessing: (entry.isProcessing as boolean) || false,
     };
   }
 
   /**
    * Map DynamoDB audio metadata to application model
    */
-  private mapAudioMetadataFromDynamoDB(dbMetadata: any): AudioMetadata {
+  private mapAudioMetadataFromDynamoDB(dbMetadata: unknown): AudioMetadata {
+    const metadata = dbMetadata as Record<string, unknown>;
     return {
-      id: dbMetadata.id,
-      sessionId: dbMetadata.sessionId,
-      s3Key: dbMetadata.s3Key,
-      duration: dbMetadata.duration || 0,
-      format: dbMetadata.format,
-      language: dbMetadata.language,
-      createdAt: new Date(dbMetadata.createdAt || Date.now()),
+      id: metadata.id as string,
+      sessionId: metadata.sessionId as string,
+      s3Key: metadata.s3Key as string,
+      duration: (metadata.duration as number) || 0,
+      format: metadata.format as string,
+      language: metadata.language as string,
+      createdAt: new Date((metadata.createdAt as string) || Date.now()),
     };
   }
 

@@ -349,24 +349,24 @@ export class ErrorRecoveryManager {
   }
 
   private hasFallbackService(serviceType: ServiceType): boolean {
-    const fallbackMap = {
+    const fallbackMap: Partial<Record<ServiceType, ServiceType | null>> = {
       [ServiceType.TRANSCRIBE_MEDICAL]: ServiceType.TRANSCRIBE_STANDARD,
       [ServiceType.BEDROCK]: null, // Graceful degradation instead
     };
     
-    return fallbackMap[serviceType] !== undefined;
+    return serviceType in fallbackMap && fallbackMap[serviceType] !== undefined;
   }
 
   private getFallbackService(serviceType: ServiceType): ServiceType | null {
-    const fallbackMap = {
+    const fallbackMap: Partial<Record<ServiceType, ServiceType | null>> = {
       [ServiceType.TRANSCRIBE_MEDICAL]: ServiceType.TRANSCRIBE_STANDARD,
     };
     
-    return fallbackMap[serviceType] || null;
+    return (serviceType in fallbackMap) ? fallbackMap[serviceType]! : null;
   }
 
   private getDegradationStrategy(serviceType: ServiceType): { message: string } {
-    const degradationStrategies = {
+    const degradationStrategies: Partial<Record<ServiceType, { message: string }>> = {
       [ServiceType.BEDROCK]: {
         message: 'AI enhancement disabled, using basic translation'
       },
@@ -384,7 +384,7 @@ export class ErrorRecoveryManager {
       }
     };
     
-    return degradationStrategies[serviceType] || {
+    return (serviceType in degradationStrategies) ? degradationStrategies[serviceType]! : {
       message: 'Service temporarily degraded, limited functionality available'
     };
   }

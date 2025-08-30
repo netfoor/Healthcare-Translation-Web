@@ -111,7 +111,7 @@ export function SystemMonitor({
     }
   };
 
-  const getStatusIcon = (status: HealthStatus): JSX.Element => {
+  const getStatusIcon = (status: HealthStatus): React.ReactElement => {
     switch (status) {
       case HealthStatus.HEALTHY:
         return (

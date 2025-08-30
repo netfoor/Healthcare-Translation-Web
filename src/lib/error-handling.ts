@@ -65,7 +65,7 @@ export interface RetryConfig {
 export interface FallbackStrategy {
   primaryService: ServiceType;
   fallbackService?: ServiceType;
-  fallbackAction?: () => Promise<any>;
+  fallbackAction?: () => Promise<unknown>;
   errorThreshold: number;
   cooldownPeriod: number;
 }
@@ -229,13 +229,18 @@ export class ErrorHandler {
     const severity = this.determineSeverity(category, serviceType);
     const correlationId = this.generateCorrelationId();
 
-    const baseError: ServiceError = 'code' in error ? error : {
-      code: 'UNKNOWN_ERROR',
-      message: error.message,
-      service: serviceType,
-      timestamp: new Date(),
-      retryable: this.isRetryableCategory(category)
-    };
+    let baseError: ServiceError;
+    if ('code' in error) {
+      baseError = error;
+    } else {
+      baseError = {
+        code: 'UNKNOWN_ERROR',
+        message: error.message,
+        service: serviceType,
+        timestamp: new Date(),
+        retryable: this.isRetryableCategory(category)
+      };
+    }
 
     return {
       ...baseError,
@@ -599,34 +604,34 @@ export const globalErrorHandler = new ErrorHandler();
  * Convenience functions for common error handling patterns
  */
 
-export function createNetworkError(message: string, serviceType: ServiceType): EnhancedServiceError {
-  return globalErrorHandler.handleError(
+export async function createNetworkError(message: string, serviceType: ServiceType): Promise<EnhancedServiceError> {
+  return await globalErrorHandler.handleError(
     new Error(message),
     serviceType,
     { category: ErrorCategory.NETWORK }
-  ) as any;
+  );
 }
 
-export function createServiceUnavailableError(serviceType: ServiceType): EnhancedServiceError {
-  return globalErrorHandler.handleError(
+export async function createServiceUnavailableError(serviceType: ServiceType): Promise<EnhancedServiceError> {
+  return await globalErrorHandler.handleError(
     new Error(`${serviceType} service is currently unavailable`),
     serviceType,
     { category: ErrorCategory.SERVICE_UNAVAILABLE }
-  ) as any;
+  );
 }
 
-export function createTimeoutError(serviceType: ServiceType, timeoutMs: number): EnhancedServiceError {
-  return globalErrorHandler.handleError(
+export async function createTimeoutError(serviceType: ServiceType, timeoutMs: number): Promise<EnhancedServiceError> {
+  return await globalErrorHandler.handleError(
     new Error(`Operation timed out after ${timeoutMs}ms`),
     serviceType,
     { category: ErrorCategory.TIMEOUT, timeoutMs }
-  ) as any;
+  );
 }
 
-export function createValidationError(message: string, serviceType: ServiceType): EnhancedServiceError {
-  return globalErrorHandler.handleError(
+export async function createValidationError(message: string, serviceType: ServiceType): Promise<EnhancedServiceError> {
+  return await globalErrorHandler.handleError(
     new Error(message),
     serviceType,
     { category: ErrorCategory.VALIDATION }
-  ) as any;
+  );
 }

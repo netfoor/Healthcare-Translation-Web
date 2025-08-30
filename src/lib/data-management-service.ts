@@ -263,7 +263,7 @@ export class DataManagementService {
         throw new Error('Session not found');
       }
 
-      let exportData: any = {
+      let exportData: Record<string, unknown> = {
         session,
         exportedAt: new Date().toISOString(),
         options,
@@ -284,12 +284,14 @@ export class DataManagementService {
       // Apply date range filter if specified
       if (options.dateRange) {
         if (exportData.transcripts) {
-          exportData.transcripts = exportData.transcripts.filter((t: TranscriptEntry) =>
+          const transcripts = exportData.transcripts as TranscriptEntry[];
+          exportData.transcripts = transcripts.filter((t: TranscriptEntry) =>
             t.timestamp >= options.dateRange!.start && t.timestamp <= options.dateRange!.end
           );
         }
         if (exportData.audioFiles) {
-          exportData.audioFiles = exportData.audioFiles.filter((a: AudioMetadata) =>
+          const audioFiles = exportData.audioFiles as AudioMetadata[];
+          exportData.audioFiles = audioFiles.filter((a: AudioMetadata) =>
             a.createdAt >= options.dateRange!.start && a.createdAt <= options.dateRange!.end
           );
         }
@@ -355,12 +357,12 @@ export class DataManagementService {
     };
 
     try {
-      let importData: any;
+      let importData: Record<string, unknown>;
 
       if (typeof data === 'string') {
-        importData = JSON.parse(data);
+        importData = JSON.parse(data) as Record<string, unknown>;
       } else {
-        importData = data;
+        importData = data as Record<string, unknown>;
       }
 
       // Validate data structure if requested
@@ -389,12 +391,12 @@ export class DataManagementService {
       if (importData.transcripts && Array.isArray(importData.transcripts)) {
         for (const transcript of importData.transcripts) {
           try {
-            const transcriptData = transcript as any;
+            const transcriptData = transcript as Record<string, unknown>;
             await transcriptService.createTranscriptEntry(
               options.sessionId,
-              transcriptData.originalText,
-              transcriptData.confidence,
-              transcriptData.speaker
+              transcriptData.originalText as string,
+              transcriptData.confidence as number,
+              transcriptData.speaker as string | undefined
             );
             result.imported.transcripts++;
           } catch (error) {
@@ -495,7 +497,7 @@ export class DataManagementService {
   /**
    * Run comprehensive data cleanup
    */
-  async runDataCleanup(force: boolean = false): Promise<any> {
+  async runDataCleanup(force: boolean = false): Promise<unknown> {
     try {
       return await dataRetentionService.runCleanup(force);
     } catch (error) {
@@ -525,13 +527,14 @@ export class DataManagementService {
   /**
    * Convert data to CSV format
    */
-  private convertToCSV(data: any): string {
+  private convertToCSV(data: Record<string, unknown>): string {
     // Simplified CSV conversion - would need more robust implementation
     let csv = '';
 
     if (data.transcripts && Array.isArray(data.transcripts)) {
+      const transcripts = data.transcripts as TranscriptEntry[];
       csv += 'Timestamp,Original Text,Translated Text,Confidence,Speaker\n';
-      data.transcripts.forEach((t: TranscriptEntry) => {
+      transcripts.forEach((t: TranscriptEntry) => {
         csv += `"${t.timestamp.toISOString()}","${t.originalText}","${t.translatedText || ''}",${t.confidence},"${t.speaker || ''}"\n`;
       });
     }
@@ -542,16 +545,18 @@ export class DataManagementService {
   /**
    * Convert data to text format
    */
-  private convertToText(data: any): string {
+  private convertToText(data: Record<string, unknown>): string {
+    const session = data.session as TranslationSession;
     let text = `Session Export\n`;
     text += `Generated: ${new Date().toISOString()}\n`;
-    text += `Session ID: ${data.session?.id}\n\n`;
+    text += `Session ID: ${session?.id}\n\n`;
 
     if (data.transcripts && Array.isArray(data.transcripts)) {
+      const transcripts = data.transcripts as TranscriptEntry[];
       text += 'Transcripts:\n';
       text += '===========\n\n';
 
-      data.transcripts.forEach((t: TranscriptEntry, index: number) => {
+      transcripts.forEach((t: TranscriptEntry, index: number) => {
         text += `Entry ${index + 1} (${t.timestamp.toLocaleString()})\n`;
         text += `Original: ${t.originalText}\n`;
         if (t.translatedText) {
@@ -571,12 +576,13 @@ export class DataManagementService {
   /**
    * Validate import data structure
    */
-  private validateImportData(data: any): void {
+  private validateImportData(data: unknown): void {
     if (!data || typeof data !== 'object') {
       throw new Error('Invalid import data: must be an object');
     }
 
-    if (data.transcripts && !Array.isArray(data.transcripts)) {
+    const obj = data as Record<string, unknown>;
+    if (obj.transcripts && !Array.isArray(obj.transcripts)) {
       throw new Error('Invalid import data: transcripts must be an array');
     }
 

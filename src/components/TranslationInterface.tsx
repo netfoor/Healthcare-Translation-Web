@@ -9,6 +9,11 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { ResponsiveLayout } from './ResponsiveLayout';
 import { TranscriptEntry, ServiceError } from '../lib/types';
 import { DEFAULT_LANGUAGES } from '../lib/languages';
+import { useAwsServices } from '../hooks/useAwsServices';
+import { sendAudioChunk, translateText, synthesizeSpeech } from '../lib/aws-websocket-service';
+import { WebSocketFallback } from './WebSocketFallback';
+// Import the console helper for global testing functions
+import '../lib/websocket-console-helper';
 
 export interface TranslationInterfaceProps {
   className?: string;
@@ -23,6 +28,9 @@ export function TranslationInterface({
   onSessionEnd,
   onError
 }: TranslationInterfaceProps) {
+  // AWS services initialization
+  const { initialized, error: awsError, isMockMode } = useAwsServices();
+  
   // Language state
   const [inputLanguage, setInputLanguage] = useState(DEFAULT_LANGUAGES.input);
   const [outputLanguage, setOutputLanguage] = useState(DEFAULT_LANGUAGES.output);
@@ -37,9 +45,39 @@ export function TranslationInterface({
   // Recording state
   const [isRecording, setIsRecording] = useState(false);
   const [sessionActive, setSessionActive] = useState(false);
+  const [sessionId, setSessionId] = useState(`session_${Date.now()}`);
 
   // Error state
   const [lastError, setLastError] = useState<ServiceError | null>(null);
+
+  /**
+   * Handle errors
+   */
+  const handleError = useCallback((error: ServiceError) => {
+    setLastError(error);
+    onError?.(error);
+    
+    // Auto-clear error after 5 seconds
+    setTimeout(() => {
+      setLastError(null);
+    }, 5000);
+  }, [onError]);
+
+  // Log AWS initialization status
+  useEffect(() => {
+    if (awsError) {
+      console.error('AWS services initialization error:', awsError);
+      handleError({
+        code: 'AWS_INIT_FAILED',
+        message: 'Failed to initialize AWS services: ' + awsError.message,
+        service: 'AWS Services',
+        timestamp: new Date(),
+        retryable: true
+      });
+    } else {
+      console.log('AWS services initialization status:', initialized ? 'Success' : 'Pending', 'Mock mode:', isMockMode);
+    }
+  }, [initialized, awsError, isMockMode]);
 
   /**
    * Handle language change with persistence
@@ -80,11 +118,10 @@ export function TranslationInterface({
    * Handle audio chunk from voice input
    */
   const handleAudioChunk = useCallback((chunk: ArrayBuffer) => {
-    // TODO: Send audio chunk to transcription service
     console.log('Audio chunk received:', chunk.byteLength, 'bytes');
     
-    // Mock transcription for development
-    if (process.env.NODE_ENV === 'development') {
+    if (isMockMode) {
+      console.log('Using mock transcription services');
       // Simulate real-time transcription
       setTimeout(() => {
         const mockTranscripts = [
@@ -113,8 +150,55 @@ export function TranslationInterface({
           setIsTranslating(false);
         }, 1500);
       }, 500);
+    } else {
+      // Use real AWS services
+      console.log('Using real AWS services with WebSocket');
+      
+      // Process the audio chunk through AWS Transcribe via WebSocket
+      sendAudioChunk(chunk, inputLanguage, sessionId)
+        .then(result => {
+          if (result) {
+            console.log('Transcription result:', result);
+            setOriginalText(result.text);
+            
+            // If final result, request translation
+            if (result.isFinal && result.text.trim()) {
+              setIsTranslating(true);
+              
+              translateText(result.text, inputLanguage, outputLanguage, sessionId)
+                .then(translationResult => {
+                  if (translationResult) {
+                    console.log('Translation result:', translationResult);
+                    setTranslatedText(translationResult.translated);
+                    setIsTranslating(false);
+                  }
+                })
+                .catch(error => {
+                  console.error('Translation error:', error);
+                  setIsTranslating(false);
+                  handleError({
+                    code: 'TRANSLATION_ERROR',
+                    message: 'Failed to translate text',
+                    service: 'Translation Service',
+                    timestamp: new Date(),
+                    retryable: true
+                  });
+                });
+            }
+          }
+        })
+        .catch(error => {
+          console.error('Transcription error:', error);
+          handleError({
+            code: 'TRANSCRIPTION_ERROR',
+            message: 'Failed to transcribe audio',
+            service: 'Transcription Service',
+            timestamp: new Date(),
+            retryable: true
+          });
+        });
     }
-  }, []);
+  }, [isMockMode, inputLanguage, outputLanguage, sessionId, handleError]);
 
   /**
    * Handle recording state change
@@ -132,11 +216,10 @@ export function TranslationInterface({
    * Handle text-to-speech playback
    */
   const handleSpeakTranslation = useCallback((text: string) => {
-    // TODO: Implement TTS playback
     console.log('Speaking text:', text);
     
-    // Mock audio playback for development
-    if (process.env.NODE_ENV === 'development') {
+    if (isMockMode) {
+      console.log('Using mock TTS services');
       // Find the entry ID for highlighting
       const entry = transcriptEntries.find(e => e.translatedText === text);
       if (entry) {
@@ -147,21 +230,58 @@ export function TranslationInterface({
           setCurrentPlayingId(undefined);
         }, 3000);
       }
+    } else {
+      console.log('Using real AWS Polly TTS service');
+      
+      // Use real AWS Polly service via WebSocket
+      synthesizeSpeech(text, outputLanguage, sessionId)
+        .then(result => {
+          if (result && result.audioUrl) {
+            console.log('TTS result:', result);
+            
+            // Find the entry for highlighting
+            const entry = transcriptEntries.find(e => e.translatedText === text);
+            if (entry) {
+              setCurrentPlayingId(entry.id);
+            }
+            
+            // Create and play audio element
+            const audio = new Audio(result.audioUrl);
+            
+            audio.onended = () => {
+              setCurrentPlayingId(undefined);
+            };
+            
+            audio.onerror = (err) => {
+              console.error('Error playing audio:', err);
+              setCurrentPlayingId(undefined);
+              handleError({
+                code: 'AUDIO_PLAYBACK_ERROR',
+                message: 'Failed to play synthesized audio',
+                service: 'TTS Service',
+                timestamp: new Date(),
+                retryable: true
+              });
+            };
+            
+            audio.play().catch(err => {
+              console.error('Failed to play audio:', err);
+              setCurrentPlayingId(undefined);
+            });
+          }
+        })
+        .catch(error => {
+          console.error('TTS error:', error);
+          handleError({
+            code: 'TTS_ERROR',
+            message: 'Failed to synthesize speech',
+            service: 'TTS Service',
+            timestamp: new Date(),
+            retryable: true
+          });
+        });
     }
-  }, [transcriptEntries]);
-
-  /**
-   * Handle errors
-   */
-  const handleError = useCallback((error: ServiceError) => {
-    setLastError(error);
-    onError?.(error);
-    
-    // Auto-clear error after 5 seconds
-    setTimeout(() => {
-      setLastError(null);
-    }, 5000);
-  }, [onError]);
+  }, [transcriptEntries, isMockMode, outputLanguage, sessionId, handleError]);
 
   /**
    * Finalize current transcript entry
@@ -218,55 +338,62 @@ export function TranslationInterface({
 
   return (
     <div className={`w-full h-full ${className}`}>
-      <ResponsiveLayout
-        // Language settings
-        inputLanguage={inputLanguage}
-        outputLanguage={outputLanguage}
-        onLanguageChange={handleLanguageChange}
-        
-        // Transcript data
-        originalText={originalText}
-        translatedText={translatedText}
-        isTranslating={isTranslating}
-        transcriptEntries={transcriptEntries}
-        currentPlayingId={currentPlayingId}
-        
-        // Voice input
-        onAudioChunk={handleAudioChunk}
-        onRecordingStateChange={handleRecordingStateChange}
-        
-        // Audio playback
-        onSpeakTranslation={handleSpeakTranslation}
-        
-        // Error handling
-        onError={handleError}
-        
-        // State
-        disabled={false}
-      />
-
-      {/* Session Controls (floating action buttons for mobile) */}
-      {sessionActive && (
-        <div className="fixed bottom-6 right-6 flex flex-col gap-3 z-40">
-          <button
-            onClick={handleClearTranscripts}
-            className="w-12 h-12 bg-gray-600 hover:bg-gray-700 text-white rounded-full shadow-lg transition-colors flex items-center justify-center"
-            title="Clear transcripts"
-            aria-label="Clear all transcripts"
-          >
-            <TrashIcon className="w-5 h-5" />
-          </button>
+      <WebSocketFallback
+        onFallbackActivated={() => {
+          console.log('WebSocket fallback activated');
+          // You could set isMockMode or other state here if needed
+        }}
+      >
+        <ResponsiveLayout
+          // Language settings
+          inputLanguage={inputLanguage}
+          outputLanguage={outputLanguage}
+          onLanguageChange={handleLanguageChange}
           
-          <button
-            onClick={handleSessionEnd}
-            className="w-12 h-12 bg-red-600 hover:bg-red-700 text-white rounded-full shadow-lg transition-colors flex items-center justify-center"
-            title="End session"
-            aria-label="End translation session"
-          >
-            <StopIcon className="w-5 h-5" />
-          </button>
-        </div>
-      )}
+          // Transcript data
+          originalText={originalText}
+          translatedText={translatedText}
+          isTranslating={isTranslating}
+          transcriptEntries={transcriptEntries}
+          currentPlayingId={currentPlayingId}
+          
+          // Voice input
+          onAudioChunk={handleAudioChunk}
+          onRecordingStateChange={handleRecordingStateChange}
+          
+          // Audio playback
+          onSpeakTranslation={handleSpeakTranslation}
+          
+          // Error handling
+          onError={handleError}
+          
+          // State
+          disabled={false}
+        />
+
+        {/* Session Controls (floating action buttons for mobile) */}
+        {sessionActive && (
+          <div className="fixed bottom-6 right-6 flex flex-col gap-3 z-40">
+            <button
+              onClick={handleClearTranscripts}
+              className="w-12 h-12 bg-gray-600 hover:bg-gray-700 text-white rounded-full shadow-lg transition-colors flex items-center justify-center"
+              title="Clear transcripts"
+              aria-label="Clear all transcripts"
+            >
+              <TrashIcon className="w-5 h-5" />
+            </button>
+            
+            <button
+              onClick={handleSessionEnd}
+              className="w-12 h-12 bg-red-600 hover:bg-red-700 text-white rounded-full shadow-lg transition-colors flex items-center justify-center"
+              title="End session"
+              aria-label="End translation session"
+            >
+              <StopIcon className="w-5 h-5" />
+            </button>
+          </div>
+        )}
+      </WebSocketFallback>
 
       {/* Error Toast */}
       {lastError && (
@@ -297,6 +424,7 @@ export function TranslationInterface({
           <div>Recording: {isRecording ? 'ON' : 'OFF'}</div>
           <div>Session: {sessionActive ? 'ACTIVE' : 'INACTIVE'}</div>
           <div>Entries: {transcriptEntries.length}</div>
+          <div>Mode: {isMockMode ? 'MOCK' : 'REAL'}</div>
         </div>
       )}
     </div>

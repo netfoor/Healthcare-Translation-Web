@@ -374,7 +374,7 @@ export class ServiceHealthMonitor {
     try {
       const healthCheckPromise = this.executeServiceHealthCheck(serviceType);
       const result = await Promise.race([healthCheckPromise, timeout]);
-      return result;
+      return result as { healthy: boolean; message: string; details?: Record<string, unknown>; error?: string };
     } catch (error) {
       return {
         healthy: false,

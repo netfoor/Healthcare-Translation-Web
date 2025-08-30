@@ -199,7 +199,7 @@ export class AudioStorageService {
           key: metadata.s3Key,
         }).result;
 
-        const data = await (downloadResult.body as any).arrayBuffer();
+        const data = await (downloadResult.body as unknown as Blob).arrayBuffer();
 
         return {
           data,
@@ -237,7 +237,7 @@ export class AudioStorageService {
           key: s3Key,
         }).result;
 
-        const data = await (downloadResult.body as any).arrayBuffer();
+        const data = await (downloadResult.body as unknown as Blob).arrayBuffer();
         return { data };
       }
     } catch (error) {

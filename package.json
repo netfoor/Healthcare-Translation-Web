@@ -4,12 +4,19 @@
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
+    "dev:https": "node server.js",
+    "dev:ngrok": "ngrok http 3000",
     "build": "next build --turbopack",
     "start": "next start",
     "lint": "eslint",
     "test": "jest",
     "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage"
+    "test:coverage": "jest --coverage",
+    "create-certs": "mkcert -install && mkdir -p certificates && mkcert -key-file ./certificates/localhost-key.pem -cert-file ./certificates/localhost.pem localhost 127.0.0.1 ::1",
+    "update-amplify-urls": "node scripts/update-amplify-urls.js",
+    "predeploy": "npm run build",
+    "deploy": "node scripts/deploy-with-amplify.js",
+    "deploy:manual": "cd cdk && npm run deploy"
   },
   "dependencies": {
     "@testing-library/react": "^16.3.0",
