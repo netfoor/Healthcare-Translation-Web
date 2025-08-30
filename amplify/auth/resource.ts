@@ -13,20 +13,12 @@ export const auth = defineAuth({
       callbackUrls: [
         'http://localhost:3000/',
         'http://localhost:3000/auth/callback',
-        // Production URLs (only include if defined)
-        ...(process.env.AMPLIFY_APP_URL
-          ? [
-              process.env.AMPLIFY_APP_URL,
-              `${process.env.AMPLIFY_APP_URL}/auth/callback`,
-            ]
-          : []),
+        'https://main.d19o5jdw6rh2dj.amplifyapp.com/',
+        'https://main.d19o5jdw6rh2dj.amplifyapp.com/auth/callback',
       ],
       logoutUrls: [
         'http://localhost:3000/',
-        // Production logout URL (only include if defined)
-        ...(process.env.AMPLIFY_APP_URL
-          ? [`${process.env.AMPLIFY_APP_URL}/`]
-          : []),
+        'https://main.d19o5jdw6rh2dj.amplifyapp.com/',
       ],
     },
   },
