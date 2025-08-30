@@ -3,11 +3,32 @@ import { TranslateClient, TranslateTextCommand } from '@aws-sdk/client-translate
 import { DynamoDBClient, PutItemCommand, GetItemCommand, QueryCommand, UpdateItemCommand } from '@aws-sdk/client-dynamodb';
 import { BedrockRuntimeClient, InvokeModelCommand } from '@aws-sdk/client-bedrock-runtime';
 import { ApiGatewayManagementApiClient, PostToConnectionCommand } from '@aws-sdk/client-apigatewaymanagementapi';
+import {
+    detectMedicalScenario,
+    validateMedicalTerminology,
+    enhanceForHealthcareScenario,
+    generateMedicalCorrections,
+    MedicalTerminologyUtils,
+    MedicalContext
+} from './medical-enhancement-service';
 
-// Initialize AWS clients
-const translateClient = new TranslateClient({ region: process.env.AWS_REGION });
-const dynamoClient = new DynamoDBClient({ region: process.env.AWS_REGION });
-const bedrockClient = new BedrockRuntimeClient({ region: process.env.AWS_REGION });
+// Initialize AWS clients (will be mocked in tests)
+let translateClient: TranslateClient;
+let dynamoClient: DynamoDBClient;
+let bedrockClient: BedrockRuntimeClient;
+
+// Initialize clients function for better testability
+function initializeClients() {
+    if (!translateClient) {
+        translateClient = new TranslateClient({ region: process.env.AWS_REGION });
+    }
+    if (!dynamoClient) {
+        dynamoClient = new DynamoDBClient({ region: process.env.AWS_REGION });
+    }
+    if (!bedrockClient) {
+        bedrockClient = new BedrockRuntimeClient({ region: process.env.AWS_REGION });
+    }
+}
 
 // Types for translation service
 interface TranslationRequest {
@@ -20,12 +41,7 @@ interface TranslationRequest {
     useCache?: boolean;
 }
 
-interface MedicalContext {
-    specialty?: string;
-    commonTerms: string[];
-    previousContext: string[];
-    urgencyLevel: 'low' | 'medium' | 'high';
-}
+// MedicalContext is now imported from medical-enhancement-service
 
 interface TranslationResult {
     originalText: string;
@@ -36,6 +52,13 @@ interface TranslationResult {
     medicalTermsDetected: string[];
     cached: boolean;
     timestamp: string;
+    medicalScenario?: string;
+    terminologyValidation?: {
+        isValid: boolean;
+        suggestions: string[];
+        medicalAccuracy: number;
+    };
+    enhancementApplied?: boolean;
 }
 
 interface CachedTranslation {
@@ -61,7 +84,7 @@ async function checkTranslationCache(
 ): Promise<CachedTranslation | null> {
     try {
         const cacheKey = generateCacheKey(text, sourceLanguage, targetLanguage);
-        
+
         const command = new GetItemCommand({
             TableName: process.env.TRANSLATION_CACHE_TABLE || 'healthcare-translation-cache',
             Key: {
@@ -70,11 +93,11 @@ async function checkTranslationCache(
         });
 
         const result = await dynamoClient.send(command);
-        
+
         if (result.Item) {
             // Update access count
             await updateCacheAccessCount(cacheKey);
-            
+
             return {
                 translationKey: cacheKey,
                 translatedText: result.Item.translatedText.S!,
@@ -84,7 +107,7 @@ async function checkTranslationCache(
                 accessCount: parseInt(result.Item.accessCount.N!) + 1
             };
         }
-        
+
         return null;
     } catch (error) {
         console.error('Error checking translation cache:', error);
@@ -125,7 +148,7 @@ async function storeTranslationCache(
     try {
         const cacheKey = generateCacheKey(text, sourceLanguage, targetLanguage);
         const timestamp = new Date().toISOString();
-        
+
         const command = new PutItemCommand({
             TableName: process.env.TRANSLATION_CACHE_TABLE || 'healthcare-translation-cache',
             Item: {
@@ -175,7 +198,7 @@ Response format: ["term1", "term2", "term3"]`;
 
         const response = await bedrockClient.send(command);
         const responseBody = JSON.parse(new TextDecoder().decode(response.body));
-        
+
         try {
             const medicalTerms = JSON.parse(responseBody.content[0].text);
             return Array.isArray(medicalTerms) ? medicalTerms : [];
@@ -206,7 +229,7 @@ async function translateWithAmazonTranslate(
         });
 
         const result = await translateClient.send(command);
-        
+
         return {
             translatedText: result.TranslatedText || '',
             confidence: 0.85 // Amazon Translate doesn't provide confidence scores, using default
@@ -266,9 +289,9 @@ Improved translation:`;
 
         const response = await bedrockClient.send(command);
         const responseBody = JSON.parse(new TextDecoder().decode(response.body));
-        
+
         const enhancedText = responseBody.content[0].text.trim();
-        
+
         return {
             enhancedText: enhancedText || translatedText,
             confidence: 0.92 // Higher confidence for AI-enhanced translations
@@ -291,21 +314,21 @@ function calculateTranslationMetrics(
     // Basic quality metrics
     const lengthRatio = translatedText.length / originalText.length;
     const lengthScore = Math.max(0, 1 - Math.abs(lengthRatio - 1));
-    
+
     // Medical terms preservation score
     const medicalTermsScore = medicalTermsDetected.length > 0 ? 0.9 : 1.0;
-    
+
     // Overall confidence calculation
     const confidence = (lengthScore * 0.3 + medicalTermsScore * 0.7);
     const qualityScore = Math.min(0.95, Math.max(0.6, confidence));
-    
+
     return { confidence: qualityScore, qualityScore };
 }
 
-// Main translation function
+// Main translation function with enhanced medical processing
 async function performTranslation(request: TranslationRequest): Promise<TranslationResult> {
     const { text, sourceLanguage, targetLanguage, medicalContext, useCache = true } = request;
-    
+
     // Check cache first if enabled
     if (useCache) {
         const cachedResult = await checkTranslationCache(text, sourceLanguage, targetLanguage);
@@ -322,56 +345,95 @@ async function performTranslation(request: TranslationRequest): Promise<Translat
             };
         }
     }
-    
-    // Detect medical terms in original text
-    const medicalTermsDetected = await detectMedicalTerms(text);
-    
+
+    // Detect medical scenario and terms using enhanced service
+    const medicalScenario = await detectMedicalScenario(text);
+    const medicalTermsDetected = MedicalTerminologyUtils.extractMedicalTerms(text);
+
     // Perform core translation
     const { translatedText, confidence: baseConfidence } = await translateWithAmazonTranslate(
         text,
         sourceLanguage,
         targetLanguage
     );
-    
-    // Enhance with medical context if available
-    const { enhancedText, confidence: enhancedConfidence } = await enhanceTranslationWithMedicalContext(
+
+    // Validate medical terminology
+    const terminologyValidation = await validateMedicalTerminology(
+        text,
+        translatedText,
+        sourceLanguage,
+        targetLanguage
+    );
+
+    // Enhance translation for healthcare scenario
+    const scenarioEnhancement = await enhanceForHealthcareScenario(
         text,
         translatedText,
         sourceLanguage,
         targetLanguage,
-        medicalContext
+        medicalScenario
     );
-    
-    // Calculate final quality metrics
-    const { confidence: finalConfidence } = calculateTranslationMetrics(
+
+    // Generate medical corrections if needed
+    const corrections = await generateMedicalCorrections(
         text,
-        enhancedText,
-        medicalTermsDetected
-    );
-    
-    const result: TranslationResult = {
-        originalText: text,
-        translatedText: enhancedText,
+        scenarioEnhancement.enhancedText,
         sourceLanguage,
         targetLanguage,
-        confidence: Math.max(enhancedConfidence, finalConfidence),
+        medicalContext
+    );
+
+    // Apply corrections to get final translation
+    let finalTranslation = scenarioEnhancement.enhancedText;
+    let enhancementApplied = false;
+
+    if (corrections.corrections.length > 0) {
+        // Apply the most confident corrections
+        corrections.corrections.forEach(correction => {
+            if (correction.confidence > 0.8) {
+                finalTranslation = finalTranslation.replace(correction.original, correction.corrected);
+                enhancementApplied = true;
+            }
+        });
+    }
+
+    // Calculate final confidence score
+    const finalConfidence = Math.min(0.95, Math.max(
+        baseConfidence,
+        scenarioEnhancement.confidence,
+        terminologyValidation.confidence
+    ));
+
+    const result: TranslationResult = {
+        originalText: text,
+        translatedText: finalTranslation,
+        sourceLanguage,
+        targetLanguage,
+        confidence: finalConfidence,
         medicalTermsDetected,
         cached: false,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        medicalScenario,
+        terminologyValidation: {
+            isValid: terminologyValidation.isValid,
+            suggestions: terminologyValidation.suggestions,
+            medicalAccuracy: terminologyValidation.medicalAccuracy
+        },
+        enhancementApplied
     };
-    
-    // Store in cache for future use
-    if (useCache && medicalTermsDetected.length > 0) {
+
+    // Store in cache for future use (prioritize medical content)
+    if (useCache && (medicalTermsDetected.length > 0 || MedicalTerminologyUtils.isEmergencyText(text))) {
         await storeTranslationCache(
             text,
             sourceLanguage,
             targetLanguage,
-            enhancedText,
+            finalTranslation,
             result.confidence,
             medicalTermsDetected
         );
     }
-    
+
     return result;
 }
 
@@ -385,12 +447,12 @@ async function sendWebSocketResponse(
         const apiGatewayClient = new ApiGatewayManagementApiClient({
             endpoint: apiGatewayEndpoint
         });
-        
+
         const command = new PostToConnectionCommand({
             ConnectionId: connectionId,
             Data: JSON.stringify(data)
         });
-        
+
         await apiGatewayClient.send(command);
     } catch (error) {
         console.error('Error sending WebSocket response:', error);
@@ -401,25 +463,28 @@ async function sendWebSocketResponse(
 // Lambda handler
 export const handler = async (event: APIGatewayProxyEvent, context: Context): Promise<APIGatewayProxyResult> => {
     console.log('Translation service event:', JSON.stringify(event, null, 2));
-    
+
+    // Initialize clients
+    initializeClients();
+
     try {
         const { connectionId, domainName, stage } = event.requestContext;
         const apiGatewayEndpoint = `https://${domainName}/${stage}`;
-        
+
         if (!event.body) {
             throw new Error('Request body is required');
         }
-        
+
         const request: TranslationRequest = JSON.parse(event.body);
-        
+
         // Validate required fields
         if (!request.text || !request.sourceLanguage || !request.targetLanguage) {
             throw new Error('Missing required fields: text, sourceLanguage, targetLanguage');
         }
-        
+
         // Perform translation
         const translationResult = await performTranslation(request);
-        
+
         // Send result back through WebSocket
         await sendWebSocketResponse(connectionId!, apiGatewayEndpoint, {
             action: 'translationResult',
@@ -427,7 +492,7 @@ export const handler = async (event: APIGatewayProxyEvent, context: Context): Pr
             result: translationResult,
             success: true
         });
-        
+
         return {
             statusCode: 200,
             body: JSON.stringify({
@@ -435,14 +500,14 @@ export const handler = async (event: APIGatewayProxyEvent, context: Context): Pr
                 sessionId: request.sessionId
             })
         };
-        
+
     } catch (error) {
         console.error('Translation service error:', error);
-        
+
         try {
             const { connectionId, domainName, stage } = event.requestContext;
             const apiGatewayEndpoint = `https://${domainName}/${stage}`;
-            
+
             await sendWebSocketResponse(connectionId!, apiGatewayEndpoint, {
                 action: 'translationError',
                 error: error instanceof Error ? error.message : 'Translation service error',
@@ -451,7 +516,7 @@ export const handler = async (event: APIGatewayProxyEvent, context: Context): Pr
         } catch (wsError) {
             console.error('Error sending WebSocket error response:', wsError);
         }
-        
+
         return {
             statusCode: 500,
             body: JSON.stringify({

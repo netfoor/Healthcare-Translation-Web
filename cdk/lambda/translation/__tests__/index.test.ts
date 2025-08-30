@@ -1,44 +1,56 @@
-import { handler } from '../index';
 import { APIGatewayProxyEvent, Context } from 'aws-lambda';
 
-// Mock AWS SDK clients
-jest.mock('@aws-sdk/client-translate');
-jest.mock('@aws-sdk/client-dynamodb');
-jest.mock('@aws-sdk/client-bedrock-runtime');
-jest.mock('@aws-sdk/client-apigatewaymanagementapi');
+// Mock AWS SDK clients before importing the handler
+const mockTranslateSend = jest.fn();
+const mockDynamoSend = jest.fn();
+const mockBedrockSend = jest.fn();
+const mockApiGatewaySend = jest.fn();
 
-import { TranslateClient, TranslateTextCommand } from '@aws-sdk/client-translate';
-import { DynamoDBClient, PutItemCommand, GetItemCommand } from '@aws-sdk/client-dynamodb';
-import { BedrockRuntimeClient, InvokeModelCommand } from '@aws-sdk/client-bedrock-runtime';
-import { ApiGatewayManagementApiClient, PostToConnectionCommand } from '@aws-sdk/client-apigatewaymanagementapi';
+jest.mock('@aws-sdk/client-translate', () => ({
+    TranslateClient: jest.fn().mockImplementation(() => ({
+        send: mockTranslateSend,
+    })),
+    TranslateTextCommand: jest.fn(),
+}));
 
-const mockTranslateClient = TranslateClient as jest.MockedClass<typeof TranslateClient>;
-const mockDynamoClient = DynamoDBClient as jest.MockedClass<typeof DynamoDBClient>;
-const mockBedrockClient = BedrockRuntimeClient as jest.MockedClass<typeof BedrockRuntimeClient>;
-const mockApiGatewayClient = ApiGatewayManagementApiClient as jest.MockedClass<typeof ApiGatewayManagementApiClient>;
+jest.mock('@aws-sdk/client-dynamodb', () => ({
+    DynamoDBClient: jest.fn().mockImplementation(() => ({
+        send: mockDynamoSend,
+    })),
+    PutItemCommand: jest.fn(),
+    GetItemCommand: jest.fn(),
+    UpdateItemCommand: jest.fn(),
+}));
+
+jest.mock('@aws-sdk/client-bedrock-runtime', () => ({
+    BedrockRuntimeClient: jest.fn().mockImplementation(() => ({
+        send: mockBedrockSend,
+    })),
+    InvokeModelCommand: jest.fn(),
+}));
+
+jest.mock('@aws-sdk/client-apigatewaymanagementapi', () => ({
+    ApiGatewayManagementApiClient: jest.fn().mockImplementation(() => ({
+        send: mockApiGatewaySend,
+    })),
+    PostToConnectionCommand: jest.fn(),
+}));
+
+// Import the command classes for type checking
+import { TranslateTextCommand } from '@aws-sdk/client-translate';
+import { PutItemCommand, GetItemCommand, UpdateItemCommand } from '@aws-sdk/client-dynamodb';
+import { InvokeModelCommand } from '@aws-sdk/client-bedrock-runtime';
+import { PostToConnectionCommand } from '@aws-sdk/client-apigatewaymanagementapi';
+
+import { handler } from '../index';
 
 describe('Translation Service Lambda Handler', () => {
     let mockEvent: APIGatewayProxyEvent;
     let mockContext: Context;
-    let mockTranslateSend: jest.Mock;
-    let mockDynamoSend: jest.Mock;
-    let mockBedrockSend: jest.Mock;
-    let mockApiGatewaySend: jest.Mock;
 
     beforeEach(() => {
         // Reset all mocks
         jest.clearAllMocks();
-
-        // Mock AWS SDK send methods
-        mockTranslateSend = jest.fn();
-        mockDynamoSend = jest.fn();
-        mockBedrockSend = jest.fn();
-        mockApiGatewaySend = jest.fn();
-
-        mockTranslateClient.prototype.send = mockTranslateSend;
-        mockDynamoClient.prototype.send = mockDynamoSend;
-        mockBedrockClient.prototype.send = mockBedrockSend;
-        mockApiGatewayClient.prototype.send = mockApiGatewaySend;
 
         // Mock event
         mockEvent = {
