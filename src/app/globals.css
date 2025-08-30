@@ -1,26 +1,100 @@
 @import "tailwindcss";
 
 :root {
+  /* Colores principales para la aplicación de salud */
+  --primary: #0070cd; /* Azul médico */
+  --primary-light: #e6f2ff;
+  --secondary: #1eb5c3; /* Turquesa médico */
+  --accent: #f06292; /* Rosa para contrastes clave */
+  --success: #38a169; /* Verde para confirmaciones */
+  --warning: #e89e26; /* Naranja para advertencias */
+  --error: #e53e3e; /* Rojo para errores */
+  
+  /* Colores neutros */
   --background: #ffffff;
-  --foreground: #171717;
+  --background-secondary: #f7fafc;
+  --foreground: #2d3748;
+  --foreground-light: #4a5568;
+  --foreground-muted: #718096;
+  --border: #e2e8f0;
+  --border-strong: #cbd5e0;
+  
+  /* Fuentes */
+  --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-primary: var(--primary);
+  --color-secondary: var(--secondary);
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-sans);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --primary: #3b82f6; /* Azul médico más brillante */
+    --primary-light: #1e3a8a;
+    --secondary: #0bc5ea; /* Turquesa ajustado */
+    --accent: #f472b6; /* Rosa ajustado */
+    
+    --background: #0f172a;
+    --background-secondary: #1e293b;
+    --foreground: #f1f5f9;
+    --foreground-light: #e2e8f0;
+    --foreground-muted: #94a3b8;
+    --border: #334155;
+    --border-strong: #475569;
   }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
+  line-height: 1.6;
+}
+
+/* Mejora de los estilos de los formularios y controles */
+input, select, textarea, button {
+  font-family: var(--font-sans);
+}
+
+input::placeholder, textarea::placeholder {
+  color: var(--foreground-muted);
+  opacity: 0.8;
+}
+
+/* Mejora visual para los elementos de la interfaz */
+.health-gradient {
+  background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+}
+
+.card-health {
+  background-color: var(--background);
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+  transition: all 0.3s ease;
+}
+
+.card-health:hover {
+  box-shadow: 0 10px 15px rgba(0, 0, 0, 0.1);
+  transform: translateY(-2px);
+}
+
+/* Asegurar mejor contraste para textos sobre fondos de color */
+.text-on-color {
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+/* Animaciones para feedback visual */
+@keyframes pulse-light {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+
+.animate-pulse-light {
+  animation: pulse-light 2s infinite;
 }

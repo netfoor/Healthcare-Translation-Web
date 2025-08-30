@@ -186,7 +186,7 @@ export function VoiceInput({
     };
 
     return (
-      <p className="text-sm text-gray-600 dark:text-gray-400 text-center">
+      <p className="text-sm text-blue-600 dark:text-blue-400 text-center font-medium">
         {statusMessages[buttonState]}
       </p>
     );
