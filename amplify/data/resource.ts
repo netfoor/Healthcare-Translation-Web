@@ -13,6 +13,7 @@ const schema = a.schema({
       status: a.enum(['active', 'paused', 'ended']),
       createdAt: a.datetime(),
       lastActivity: a.datetime(),
+      ttl: a.integer(), // TTL for automatic data expiration (24 hours)
       transcriptEntry: a.hasMany("TranscriptEntry", "sessionId"),
       audioMetadata: a.hasMany("AudioMetadata", "sessionId")
     })
@@ -30,6 +31,7 @@ const schema = a.schema({
       timestamp: a.datetime(),
       speaker: a.string(),
       isProcessing: a.boolean().default(false),
+      ttl: a.integer(), // TTL for automatic data expiration (24 hours)
       session: a.belongsTo('TranslationSession', 'sessionId'),
     })
     .authorization((allow) => [
@@ -44,6 +46,7 @@ const schema = a.schema({
       duration: a.float(),
       format: a.string(),
       language: a.string(),
+      ttl: a.integer(), // TTL for automatic data expiration (24 hours)
       session: a.belongsTo('TranslationSession', 'sessionId'),
     })
     .authorization((allow) => [

@@ -1,10 +1,6 @@
-import { generateClient } from 'aws-amplify/data';
 import { getCurrentUser } from 'aws-amplify/auth';
 import { TranslationSession } from './types';
-import type { Schema } from '../../amplify/data/resource';
-
-// Generate Amplify Data client with proper typing
-const client = generateClient<Schema>();
+import { dataLayer } from './data-layer';
 
 export class SessionService {
   private static instance: SessionService;
@@ -28,21 +24,19 @@ export class SessionService {
   ): Promise<TranslationSession> {
     try {
       const user = await getCurrentUser();
-      const sessionId = this.generateSessionId();
       const now = new Date();
 
-      const session: TranslationSession = {
-        id: sessionId,
+      const sessionData = {
         userId: user.userId,
         inputLanguage,
         outputLanguage,
-        status: 'active',
+        status: 'active' as const,
         createdAt: now,
         lastActivity: now,
       };
 
-      // Store session in DynamoDB via Amplify Data
-      await this.storeSessionInDynamoDB(session);
+      // Use the new data layer for session creation
+      const session = await dataLayer.createSession(sessionData);
 
       this.currentSession = session;
       return session;
@@ -71,14 +65,14 @@ export class SessionService {
     try {
       const now = new Date();
       
-      // Update session in DynamoDB
-      await this.updateSessionInDynamoDB(targetSessionId, {
+      // Use data layer for session update
+      const updatedSession = await dataLayer.updateSession(targetSessionId, {
         lastActivity: now,
       });
 
       // Update local session if it's the current one
       if (this.currentSession && this.currentSession.id === targetSessionId) {
-        this.currentSession.lastActivity = now;
+        this.currentSession = updatedSession;
       }
     } catch (error) {
       console.error('Error updating session activity:', error);
@@ -100,17 +94,14 @@ export class SessionService {
     }
 
     try {
-      await this.updateSessionInDynamoDB(targetSessionId, {
+      const updatedSession = await dataLayer.updateSession(targetSessionId, {
         inputLanguage,
         outputLanguage,
-        lastActivity: new Date(),
       });
 
       // Update local session if it's the current one
       if (this.currentSession && this.currentSession.id === targetSessionId) {
-        this.currentSession.inputLanguage = inputLanguage;
-        this.currentSession.outputLanguage = outputLanguage;
-        this.currentSession.lastActivity = new Date();
+        this.currentSession = updatedSession;
       }
     } catch (error) {
       console.error('Error updating session languages:', error);
@@ -128,9 +119,8 @@ export class SessionService {
     }
 
     try {
-      await this.updateSessionInDynamoDB(targetSessionId, {
+      await dataLayer.updateSession(targetSessionId, {
         status: 'ended',
-        lastActivity: new Date(),
       });
 
       // Clear current session if it's the one being ended
@@ -153,15 +143,13 @@ export class SessionService {
     }
 
     try {
-      await this.updateSessionInDynamoDB(targetSessionId, {
+      const updatedSession = await dataLayer.updateSession(targetSessionId, {
         status: 'paused',
-        lastActivity: new Date(),
       });
 
       // Update local session if it's the current one
       if (this.currentSession && this.currentSession.id === targetSessionId) {
-        this.currentSession.status = 'paused';
-        this.currentSession.lastActivity = new Date();
+        this.currentSession = updatedSession;
       }
     } catch (error) {
       console.error('Error pausing session:', error);
@@ -174,22 +162,14 @@ export class SessionService {
    */
   async resumeSession(sessionId: string): Promise<TranslationSession> {
     try {
-      await this.updateSessionInDynamoDB(sessionId, {
+      const updatedSession = await dataLayer.updateSession(sessionId, {
         status: 'active',
-        lastActivity: new Date(),
       });
 
-      // Load session data if not current
-      if (!this.currentSession || this.currentSession.id !== sessionId) {
-        this.currentSession = await this.loadSessionFromDynamoDB(sessionId);
-      }
+      // Set as current session
+      this.currentSession = updatedSession;
 
-      if (this.currentSession) {
-        this.currentSession.status = 'active';
-        this.currentSession.lastActivity = new Date();
-      }
-
-      return this.currentSession!;
+      return updatedSession;
     } catch (error) {
       console.error('Error resuming session:', error);
       throw new Error('Failed to resume session');
@@ -202,7 +182,8 @@ export class SessionService {
   async getUserSessions(limit: number = 10): Promise<TranslationSession[]> {
     try {
       const user = await getCurrentUser();
-      return await this.loadUserSessionsFromDynamoDB(user.userId, limit);
+      const { sessions } = await dataLayer.listUserSessions(user.userId, { limit });
+      return sessions;
     } catch (error) {
       console.error('Error loading user sessions:', error);
       throw new Error('Failed to load user sessions');
@@ -211,216 +192,48 @@ export class SessionService {
 
   /**
    * Clean up expired sessions (called automatically)
+   * Note: TTL handles automatic cleanup, but this provides manual cleanup if needed
    */
   async cleanupExpiredSessions(): Promise<void> {
     try {
       const user = await getCurrentUser();
-      const expiredSessions = await this.getExpiredSessions(user.userId);
+      const { sessions } = await dataLayer.listUserSessions(user.userId, { limit: 100 });
+      
+      const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+      const expiredSessions = sessions.filter(session => 
+        session.lastActivity < twentyFourHoursAgo
+      );
       
       for (const session of expiredSessions) {
-        await this.deleteSessionFromDynamoDB(session.id);
+        await dataLayer.deleteSession(session.id);
       }
     } catch (error) {
       console.error('Error cleaning up expired sessions:', error);
     }
   }
 
-  // Private helper methods
+  // Additional utility methods
 
-  private generateSessionId(): string {
-    return `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-  }
-
-  private async storeSessionInDynamoDB(session: TranslationSession): Promise<void> {
+  /**
+   * Load a specific session by ID
+   */
+  async loadSession(sessionId: string): Promise<TranslationSession | null> {
     try {
-      // Use Amplify Data API to create session
-      await client.models.TranslationSession.create({
-        id: session.id,
-        userId: session.userId,
-        inputLanguage: session.inputLanguage,
-        outputLanguage: session.outputLanguage,
-        status: session.status,
-        createdAt: session.createdAt.toISOString(),
-        lastActivity: session.lastActivity.toISOString(),
-      });
-    } catch (error) {
-      console.error('Failed to store session in DynamoDB:', error);
-      // Fallback to localStorage for development
-      this.storeInLocalStorage(`session_${session.id}`, {
-        sessionData: {
-          ...session,
-          createdAt: session.createdAt.toISOString(),
-          lastActivity: session.lastActivity.toISOString(),
-        },
-      });
-    }
-  }
-
-  private async updateSessionInDynamoDB(
-    sessionId: string,
-    updates: Partial<TranslationSession>
-  ): Promise<void> {
-    try {
-      // Prepare update data
-      const updateData: Record<string, unknown> = {};
-      
-      if (updates.inputLanguage) updateData.inputLanguage = updates.inputLanguage;
-      if (updates.outputLanguage) updateData.outputLanguage = updates.outputLanguage;
-      if (updates.status) updateData.status = updates.status;
-      if (updates.lastActivity) updateData.lastActivity = updates.lastActivity.toISOString();
-
-      // Use Amplify Data API to update session
-      await client.models.TranslationSession.update({
-        id: sessionId,
-        ...updateData,
-      });
-    } catch (error) {
-      console.error('Failed to update session in DynamoDB:', error);
-      // Fallback to localStorage for development
-      const existingData = this.getFromLocalStorage(`session_${sessionId}`);
-      if (existingData && existingData.sessionData && typeof existingData.sessionData === 'object') {
-        const updatedData = {
-          ...existingData,
-          sessionData: {
-            ...(existingData.sessionData as Record<string, unknown>),
-            ...updates,
-            lastActivity: updates.lastActivity?.toISOString() || (existingData.sessionData as Record<string, unknown>).lastActivity,
-          },
-        };
-        this.storeInLocalStorage(`session_${sessionId}`, updatedData);
+      const session = await dataLayer.getSession(sessionId);
+      if (session) {
+        this.currentSession = session;
       }
-    }
-  }
-
-  private async loadSessionFromDynamoDB(sessionId: string): Promise<TranslationSession> {
-    try {
-      // Use Amplify Data API to get session
-      const { data: session } = await client.models.TranslationSession.get({ id: sessionId });
-      
-      if (!session) {
-        throw new Error('Session not found');
-      }
-
-      return {
-        id: session.id,
-        userId: session.userId,
-        inputLanguage: session.inputLanguage,
-        outputLanguage: session.outputLanguage,
-        status: session.status || 'active',
-        createdAt: new Date(session.createdAt || Date.now()),
-        lastActivity: new Date(session.lastActivity || Date.now()),
-      };
+      return session;
     } catch (error) {
-      console.error('Failed to load session from DynamoDB:', error);
-      // Fallback to localStorage for development
-      const sessionData = this.getFromLocalStorage(`session_${sessionId}`);
-      if (!sessionData || !sessionData.sessionData) {
-        throw new Error('Session not found');
-      }
-
-      const session = sessionData.sessionData as Record<string, unknown>;
-      return {
-        id: session.id as string,
-        userId: session.userId as string,
-        inputLanguage: session.inputLanguage as string,
-        outputLanguage: session.outputLanguage as string,
-        status: session.status as 'active' | 'paused' | 'ended',
-        createdAt: new Date(session.createdAt as string),
-        lastActivity: new Date(session.lastActivity as string),
-      };
+      console.error('Error loading session:', error);
+      throw new Error('Failed to load session');
     }
   }
 
-  private async loadUserSessionsFromDynamoDB(
-    userId: string,
-    limit: number
-  ): Promise<TranslationSession[]> {
-    try {
-      // Use Amplify Data API to list user sessions
-      const { data: sessions } = await client.models.TranslationSession.list({
-        filter: { userId: { eq: userId } },
-        limit,
-      });
-
-      return sessions
-        .map(session => ({
-          id: session.id,
-          userId: session.userId,
-          inputLanguage: session.inputLanguage,
-          outputLanguage: session.outputLanguage,
-          status: session.status || 'active',
-          createdAt: new Date(session.createdAt || Date.now()),
-          lastActivity: new Date(session.lastActivity || Date.now()),
-        }))
-        .sort((a, b) => b.lastActivity.getTime() - a.lastActivity.getTime());
-    } catch (error) {
-      console.error('Failed to load user sessions from DynamoDB:', error);
-      // Fallback to localStorage for development
-      const sessions: TranslationSession[] = [];
-      
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key?.startsWith('session_')) {
-          const sessionData = this.getFromLocalStorage(key);
-          if (sessionData && sessionData.sessionData && typeof sessionData.sessionData === 'object') {
-            const session = sessionData.sessionData as Record<string, unknown>;
-            if (session.userId === userId) {
-              sessions.push({
-                id: session.id as string,
-                userId: session.userId as string,
-                inputLanguage: session.inputLanguage as string,
-                outputLanguage: session.outputLanguage as string,
-                status: session.status as 'active' | 'paused' | 'ended',
-                createdAt: new Date(session.createdAt as string),
-                lastActivity: new Date(session.lastActivity as string),
-              });
-            }
-          }
-        }
-      }
-
-      return sessions
-        .sort((a, b) => b.lastActivity.getTime() - a.lastActivity.getTime())
-        .slice(0, limit);
-    }
-  }
-
-  private async getExpiredSessions(userId: string): Promise<TranslationSession[]> {
-    const allSessions = await this.loadUserSessionsFromDynamoDB(userId, 100);
-    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    
-    return allSessions.filter(session => 
-      session.lastActivity < twentyFourHoursAgo
-    );
-  }
-
-  private async deleteSessionFromDynamoDB(sessionId: string): Promise<void> {
-    try {
-      // Use Amplify Data API to delete session
-      await client.models.TranslationSession.delete({ id: sessionId });
-    } catch (error) {
-      console.error('Failed to delete session from DynamoDB:', error);
-      // Fallback to localStorage for development
-      localStorage.removeItem(`session_${sessionId}`);
-    }
-  }
-
-  // Temporary localStorage methods for development
-  private storeInLocalStorage(key: string, data: Record<string, unknown>): void {
-    try {
-      localStorage.setItem(key, JSON.stringify(data));
-    } catch (error) {
-      console.warn('Failed to store in localStorage:', error);
-    }
-  }
-
-  private getFromLocalStorage(key: string): Record<string, unknown> | null {
-    try {
-      const data = localStorage.getItem(key);
-      return data ? JSON.parse(data) as Record<string, unknown> : null;
-    } catch (error) {
-      console.warn('Failed to retrieve from localStorage:', error);
-      return null;
-    }
+  /**
+   * Check data layer health
+   */
+  async checkHealth(): Promise<{ healthy: boolean; message: string }> {
+    return await dataLayer.healthCheck();
   }
 }
