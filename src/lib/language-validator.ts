@@ -51,7 +51,7 @@ export function validateLanguageCode(languageCode: string): LanguageValidationRe
         const serviceMapping = AWS_SERVICE_LANGUAGE_MAPPINGS[service];
         const hasMapping = serviceMapping[languageCode] !== undefined;
         
-        (result.serviceSupport as any)[service] = hasMapping;
+        (result.serviceSupport as Record<string, boolean>)[service] = hasMapping;
         
         if (!hasMapping) {
             result.warnings.push(`No ${service} mapping found for '${languageCode}', will use fallback`);

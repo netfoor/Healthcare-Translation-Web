@@ -46,25 +46,30 @@ export function WebSocketDemo() {
 
   // Add message listeners
   useEffect(() => {
-    const handleTranscriptionStarted = (data: any) => {
-      setSessionId(data.sessionId);
-      addMessage('received', `Transcription started: ${data.sessionId}`);
+    const handleTranscriptionStarted = (data: Record<string, unknown>) => {
+      const sessionId = data.sessionId as string;
+      setSessionId(sessionId);
+      addMessage('received', `Transcription started: ${sessionId}`);
     };
 
-    const handleAudioProcessed = (data: any) => {
-      addMessage('received', `Audio processed: ${data.transcript}`);
+    const handleAudioProcessed = (data: Record<string, unknown>) => {
+      const transcript = data.transcript as string;
+      addMessage('received', `Audio processed: ${transcript}`);
     };
 
-    const handleTranslationComplete = (data: any) => {
-      addMessage('received', `Translation: ${data.translatedText}`);
+    const handleTranslationComplete = (data: Record<string, unknown>) => {
+      const translatedText = data.translatedText as string;
+      addMessage('received', `Translation: ${translatedText}`);
     };
 
-    const handleError = (data: any) => {
-      addMessage('received', `Error: ${data.error || 'Unknown error'}`);
+    const handleError = (data: Record<string, unknown>) => {
+      const error = data.error as string | undefined;
+      addMessage('received', `Error: ${error || 'Unknown error'}`);
     };
 
-    const handlePong = (data: any) => {
-      addMessage('received', `Pong: ${data.timestamp}`);
+    const handlePong = (data: Record<string, unknown>) => {
+      const timestamp = data.timestamp as string;
+      addMessage('received', `Pong: ${timestamp}`);
     };
 
     addEventListener('transcriptionStarted', handleTranscriptionStarted);

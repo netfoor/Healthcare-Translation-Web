@@ -5,7 +5,7 @@
 
 export interface WebSocketMessage {
   action: string;
-  data: any;
+  data: Record<string, unknown>;
   sessionId?: string;
   requestId?: string;
 }
@@ -13,7 +13,7 @@ export interface WebSocketMessage {
 export interface WebSocketResponse {
   success: boolean;
   action: string;
-  data?: any;
+  data?: Record<string, unknown>;
   error?: string;
   requestId?: string;
 }
@@ -54,7 +54,7 @@ export class WebSocketManager {
   private heartbeatInterval: NodeJS.Timeout | null = null;
   private messageQueue: WebSocketMessage[] = [];
   private pendingMessages = new Map<string, PendingMessage>();
-  private listeners = new Map<string, Set<(data: any) => void>>();
+  private listeners = new Map<string, Set<(data: Record<string, unknown>) => void>>();
   private statusListeners = new Set<(status: ConnectionStatus) => void>();
 
   constructor(config: WebSocketManagerConfig) {
@@ -85,8 +85,8 @@ export class WebSocketManager {
 
       return new Promise((resolve, reject) => {
         let connectionTimeout: NodeJS.Timeout;
-        let isInitialConnection = this.reconnectAttempts === 0;
-        
+        const isInitialConnection = this.reconnectAttempts === 0;
+
         const cleanup = () => {
           if (connectionTimeout) clearTimeout(connectionTimeout);
           this.ws?.removeEventListener('open', onOpen);
@@ -156,12 +156,12 @@ export class WebSocketManager {
   disconnect(): void {
     this.clearReconnectTimeout();
     this.clearHeartbeat();
-    
+
     if (this.ws) {
       this.ws.close(1000, 'Client disconnect');
       this.ws = null;
     }
-    
+
     this.setStatus(ConnectionStatus.DISCONNECTED);
     this.rejectPendingMessages(new Error('WebSocket disconnected'));
   }
@@ -226,7 +226,7 @@ export class WebSocketManager {
   /**
    * Add event listener for specific action types
    */
-  addEventListener(action: string, listener: (data: any) => void): void {
+  addEventListener(action: string, listener: (data: Record<string, unknown>) => void): void {
     if (!this.listeners.has(action)) {
       this.listeners.set(action, new Set());
     }
@@ -236,7 +236,7 @@ export class WebSocketManager {
   /**
    * Remove event listener
    */
-  removeEventListener(action: string, listener: (data: any) => void): void {
+  removeEventListener(action: string, listener: (data: Record<string, unknown>) => void): void {
     const actionListeners = this.listeners.get(action);
     if (actionListeners) {
       actionListeners.delete(listener);
@@ -301,7 +301,7 @@ export class WebSocketManager {
   private handleClose(event: CloseEvent): void {
     console.log('WebSocket closed:', event.code, event.reason);
     this.clearHeartbeat();
-    
+
     if (event.code !== 1000) { // Not a normal closure
       this.setStatus(ConnectionStatus.RECONNECTING);
       this.scheduleReconnect();
@@ -318,16 +318,16 @@ export class WebSocketManager {
   private handleMessage(event: MessageEvent): void {
     try {
       const response: WebSocketResponse = JSON.parse(event.data);
-      
+
       // Handle response to pending message
       if (response.requestId && this.pendingMessages.has(response.requestId)) {
         const pendingMessage = this.pendingMessages.get(response.requestId)!;
         this.pendingMessages.delete(response.requestId);
-        
+
         if (pendingMessage.timeout) {
           clearTimeout(pendingMessage.timeout);
         }
-        
+
         if (response.success) {
           pendingMessage.resolve(response);
         } else {
@@ -341,7 +341,7 @@ export class WebSocketManager {
       if (actionListeners) {
         actionListeners.forEach(listener => {
           try {
-            listener(response.data);
+            listener(response.data || {});
           } catch (error) {
             console.error('Error in message listener:', error);
           }
@@ -408,7 +408,7 @@ export class WebSocketManager {
   private processMessageQueue(): void {
     const queue = [...this.messageQueue];
     this.messageQueue = [];
-    
+
     queue.forEach(message => {
       this.sendMessageAsync(message);
     });

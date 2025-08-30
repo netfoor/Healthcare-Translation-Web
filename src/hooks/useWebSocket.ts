@@ -26,8 +26,8 @@ export interface UseWebSocketReturn {
   sendMessageAsync: (message: WebSocketMessage) => void;
   
   // Event listeners
-  addEventListener: (action: string, listener: (data: any) => void) => void;
-  removeEventListener: (action: string, listener: (data: any) => void) => void;
+  addEventListener: (action: string, listener: (data: Record<string, unknown>) => void) => void;
+  removeEventListener: (action: string, listener: (data: Record<string, unknown>) => void) => void;
   
   // Statistics
   stats: {
@@ -147,13 +147,13 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketReturn {
     managerRef.current.sendMessageAsync(message);
   }, []);
 
-  const addEventListener = useCallback((action: string, listener: (data: any) => void) => {
+  const addEventListener = useCallback((action: string, listener: (data: Record<string, unknown>) => void) => {
     if (managerRef.current) {
       managerRef.current.addEventListener(action, listener);
     }
   }, []);
 
-  const removeEventListener = useCallback((action: string, listener: (data: any) => void) => {
+  const removeEventListener = useCallback((action: string, listener: (data: Record<string, unknown>) => void) => {
     if (managerRef.current) {
       managerRef.current.removeEventListener(action, listener);
     }

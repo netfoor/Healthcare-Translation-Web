@@ -58,7 +58,10 @@ export function TTSPlayer({
     const [isCached, setIsCached] = useState(false);
     const [actualVoiceId, setActualVoiceId] = useState<string | undefined>(voiceId);
 
-    const { sendMessage, isConnected } = useWebSocket();
+    const { sendMessage, isConnected } = useWebSocket({ 
+        url: process.env.NEXT_PUBLIC_WEBSOCKET_URL || 'ws://localhost:3001',
+        autoConnect: false 
+    });
     const { getCachedAudio, setCachedAudio, generateCacheKey } = useAudioPlayback({
         enableCaching
     });
@@ -183,11 +186,13 @@ export function TTSPlayer({
             const message = {
                 action: 'synthesizeSpeech',
                 sessionId,
-                text: text.trim(),
-                language,
-                voiceId,
-                useSSML,
-                enableCaching
+                data: {
+                    text: text.trim(),
+                    language,
+                    voiceId,
+                    useSSML,
+                    enableCaching
+                }
             };
 
             await sendMessage(message);
@@ -217,8 +222,10 @@ export function TTSPlayer({
             const message = {
                 action: 'generateSSML',
                 sessionId,
-                text: text.trim(),
-                language
+                data: {
+                    text: text.trim(),
+                    language
+                }
             };
 
             await sendMessage(message);
@@ -326,7 +333,7 @@ export function TTSPlayer({
                     <svg className="w-8 h-8 mx-auto mb-2 text-gray-400" fill="currentColor" viewBox="0 0 24 24">
                         <path d="M12 14c1.66 0 2.99-1.34 2.99-3L15 5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c3.28-.48 6-3.3 6-6.72h-1.7z" />
                     </svg>
-                    <p>Click "Speak" to generate audio</p>
+                    <p>Click &quot;Speak&quot; to generate audio</p>
                 </div>
             )}
         </div>
