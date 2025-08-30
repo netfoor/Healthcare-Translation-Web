@@ -5,10 +5,15 @@
   "scripts": {
     "build": "tsc",
     "build-lambdas": "node build-lambdas.js",
+    "build-lambdas:fast": "node build-lambdas.js --fast",
+    "validate-lambdas": "node build-lambdas.js --validate",
     "watch": "tsc -w",
     "test": "jest --passWithNoTests",
     "test:watch": "jest --watch --passWithNoTests",
+    "predeploy": "npm run validate-lambdas",
     "deploy": "npm run build-lambdas && cdk deploy",
+    "deploy:fast": "npm run build-lambdas:fast && cdk deploy",
+    "deploy:check": "npm run validate-lambdas && cdk synth",
     "synth": "npm run build-lambdas && cdk synth",
     "diff": "cdk diff",
     "destroy": "cdk destroy"
